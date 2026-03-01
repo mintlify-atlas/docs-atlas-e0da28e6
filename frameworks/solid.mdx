@@ -1,0 +1,554 @@
+---
+title: SolidJS
+description: Use dnd-kit with SolidJS applications
+---
+
+## Overview
+
+The SolidJS adapter provides hooks and components that integrate drag and drop functionality into your Solid applications with fine-grained reactivity and excellent performance.
+
+## Installation
+
+Install the Solid package and its dependencies:
+
+<CodeGroup>
+```bash npm
+npm install @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash yarn
+yarn add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash pnpm
+pnpm add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash bun
+bun add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+```
+</CodeGroup>
+
+<Info>
+  **Requirements**: SolidJS 1.8.0 or higher
+</Info>
+
+## Getting Started
+
+<Steps>
+  <Step title="Add DragDropProvider">
+    Wrap your application with the `DragDropProvider` component:
+
+    ```tsx
+    import {DragDropProvider} from '@dnd-kit/solid';
+
+    function App() {
+      return (
+        <DragDropProvider>
+          {/* Your app content */}
+        </DragDropProvider>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Create draggable components">
+    Use the `useDraggable` hook to make elements draggable:
+
+    ```tsx
+    import {useDraggable} from '@dnd-kit/solid';
+
+    function DraggableCard(props) {
+      const {ref, isDragging} = useDraggable({
+        id: props.id,
+        data: {title: props.title},
+      });
+
+      return (
+        <div ref={ref} style={{opacity: isDragging() ? 0.5 : 1}}>
+          {props.title}
+        </div>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Create droppable zones">
+    Use the `useDroppable` hook to create drop targets:
+
+    ```tsx
+    import {useDroppable} from '@dnd-kit/solid';
+
+    function DroppableZone(props) {
+      const {ref, isDropTarget} = useDroppable({id: props.id});
+
+      return (
+        <div
+          ref={ref}
+          style={{
+            'background-color': isDropTarget() ? 'lightblue' : 'transparent',
+          }}
+        >
+          {props.children}
+        </div>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Handle drag events">
+    Listen to events via the provider props:
+
+    ```tsx
+    function App() {
+      const handleDragEnd = (event) => {
+        const {source, target} = event.operation;
+        console.log('Dropped', source.id, 'on', target?.id);
+      };
+
+      return (
+        <DragDropProvider onDragEnd={handleDragEnd}>
+          {/* Your components */}
+        </DragDropProvider>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a full drag and drop implementation:
+
+```tsx
+import {createSignal, For} from 'solid-js';
+import {DragDropProvider, useDraggable, useDroppable} from '@dnd-kit/solid';
+
+function DraggableItem(props) {
+  const {ref, isDragging, isDragSource} = useDraggable({
+    id: props.id,
+    data: {label: props.label},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '16px',
+        margin: '8px',
+        'background-color': isDragging() ? '#e3f2fd' : '#f5f5f5',
+        border: isDragSource() ? '2px solid #2196f3' : '1px solid #ddd',
+        'border-radius': '4px',
+        cursor: 'grab',
+      }}
+    >
+      {props.label}
+    </div>
+  );
+}
+
+function DroppableZone(props) {
+  const {ref, isDropTarget} = useDroppable({id: props.id});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        'min-height': '200px',
+        padding: '16px',
+        margin: '8px',
+        'background-color': isDropTarget() ? '#e8f5e9' : '#fafafa',
+        border: '2px dashed #ccc',
+        'border-radius': '8px',
+      }}
+    >
+      <h3>{props.title}</h3>
+      <For each={props.items}>
+        {(item) => <DraggableItem id={item.id} label={item.label} />}
+      </For>
+    </div>
+  );
+}
+
+function App() {
+  const [zones, setZones] = createSignal({
+    'zone-1': [
+      {id: 'item-1', label: 'Item 1'},
+      {id: 'item-2', label: 'Item 2'},
+    ],
+    'zone-2': [
+      {id: 'item-3', label: 'Item 3'},
+    ],
+  });
+
+  const handleDragEnd = (event) => {
+    const {source, target} = event.operation;
+    
+    if (!target) return;
+
+    setZones((prev) => {
+      const newZones = {...prev};
+      
+      // Remove from all zones
+      Object.keys(newZones).forEach((zoneId) => {
+        newZones[zoneId] = newZones[zoneId].filter(
+          (item) => item.id !== source.id
+        );
+      });
+      
+      // Add to target zone
+      newZones[target.id] = [...newZones[target.id], source.data];
+      
+      return newZones;
+    });
+  };
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div style={{display: 'flex', gap: '16px', padding: '24px'}}>
+        <For each={Object.entries(zones())}>
+          {([zoneId, items]) => (
+            <DroppableZone
+              id={zoneId}
+              title={`Zone ${zoneId.split('-')[1]}`}
+              items={items}
+            />
+          )}
+        </For>
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Sortable Lists
+
+Create sortable lists with the `useSortable` hook:
+
+```tsx
+import {createSignal, For} from 'solid-js';
+import {DragDropProvider} from '@dnd-kit/solid';
+import {useSortable} from '@dnd-kit/solid/sortable';
+
+function SortableItem(props) {
+  const {ref, isDragging, isDragSource} = useSortable({
+    id: props.id,
+    index: props.index,
+    group: 'list',
+    data: {label: props.label},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '12px',
+        margin: '4px 0',
+        'background-color': isDragging() ? '#e3f2fd' : 'white',
+        border: isDragSource() ? '2px solid #2196f3' : '1px solid #ddd',
+        'border-radius': '4px',
+        cursor: 'grab',
+      }}
+    >
+      {props.label}
+    </div>
+  );
+}
+
+function SortableList() {
+  const [items, setItems] = createSignal([
+    {id: '1', label: 'Item 1'},
+    {id: '2', label: 'Item 2'},
+    {id: '3', label: 'Item 3'},
+    {id: '4', label: 'Item 4'},
+  ]);
+
+  const handleDragEnd = (event) => {
+    const {source, target} = event.operation;
+    
+    if (!target || source.index === target.index) return;
+
+    setItems((prev) => {
+      const newItems = [...prev];
+      const [removed] = newItems.splice(source.index, 1);
+      newItems.splice(target.index, 0, removed);
+      return newItems;
+    });
+  };
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div style={{'max-width': '400px', padding: '24px'}}>
+        <For each={items()}>
+          {(item, index) => (
+            <SortableItem id={item.id} index={index()} label={item.label} />
+          )}
+        </For>
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Hook APIs
+
+### useDraggable
+
+The `useDraggable` hook signature from `/home/daytona/workspace/source/packages/solid/src/core/draggable/useDraggable.ts:15`:
+
+```typescript
+function useDraggable<T extends Data = Data>(
+  input: UseDraggableInput<T>
+): {
+  draggable: Draggable<T>;
+  isDragging: () => boolean;
+  isDropping: () => boolean;
+  isDragSource: () => boolean;
+  ref: (element: Element | undefined) => void;
+  handleRef: (element: Element | undefined) => void;
+}
+
+interface UseDraggableInput<T extends Data = Data> {
+  id: string;
+  element?: Element;
+  handle?: Element;
+  data?: T;
+  disabled?: boolean;
+  modifiers?: Modifier[];
+  sensors?: Sensor[];
+  plugins?: Plugin[];
+  alignment?: Alignment;
+}
+```
+
+### useDroppable
+
+The `useDroppable` hook signature from `/home/daytona/workspace/source/packages/solid/src/core/droppable/useDroppable.ts:14`:
+
+```typescript
+function useDroppable<T extends Data = Data>(
+  input: UseDroppableInput<T>
+): {
+  droppable: Droppable<T>;
+  isDropTarget: () => boolean;
+  ref: (element: Element | undefined) => void;
+}
+
+interface UseDroppableInput<T extends Data = Data> {
+  id: string;
+  element?: Element;
+  data?: T;
+  disabled?: boolean;
+  accept?: string | string[];
+  type?: string;
+  collisionDetector?: CollisionDetector;
+}
+```
+
+### useSortable
+
+The `useSortable` hook signature from `/home/daytona/workspace/source/packages/solid/src/sortable/useSortable.ts:18`:
+
+```typescript
+function useSortable<T extends Data = Data>(
+  input: UseSortableInput<T>
+): {
+  sortable: Sortable<T>;
+  isDragging: () => boolean;
+  isDropping: () => boolean;
+  isDragSource: () => boolean;
+  isDropTarget: () => boolean;
+  ref: (element: Element | undefined) => void;
+  handleRef: (element: Element | undefined) => void;
+  sourceRef: (element: Element | undefined) => void;
+  targetRef: (element: Element | undefined) => void;
+}
+
+interface UseSortableInput<T extends Data = Data> {
+  id: string;
+  group: string;
+  index: number;
+  element?: Element;
+  handle?: Element;
+  source?: Element;
+  target?: Element;
+  data?: T;
+  disabled?: boolean;
+  type?: string;
+  accept?: string | string[];
+  modifiers?: Modifier[];
+  sensors?: Sensor[];
+  plugins?: Plugin[];
+  collisionDetector?: CollisionDetector;
+  collisionPriority?: number;
+  transition?: SortableTransition;
+  alignment?: Alignment;
+}
+```
+
+## Advanced Features
+
+### Drag Handles
+
+Use separate elements for dragging:
+
+```tsx
+function DraggableCard(props) {
+  const {ref, handleRef, isDragging} = useDraggable({id: props.id});
+
+  return (
+    <div ref={ref} style={{opacity: isDragging() ? 0.5 : 1}}>
+      <div ref={handleRef} style={{cursor: 'grab', padding: '8px'}}>
+        ☰
+      </div>
+      <div>{props.title}</div>
+    </div>
+  );
+}
+```
+
+### Modifiers
+
+Constrain drag behavior:
+
+```tsx
+import {restrictToVerticalAxis} from '@dnd-kit/abstract/modifiers';
+
+function App() {
+  return (
+    <DragDropProvider modifiers={[restrictToVerticalAxis]}>
+      {/* Content */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Sensors
+
+Customize activation:
+
+```tsx
+import {PointerSensor} from '@dnd-kit/dom';
+
+function App() {
+  const sensors = [
+    new PointerSensor({
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+  ];
+
+  return (
+    <DragDropProvider sensors={sensors}>
+      {/* Content */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Type Safety
+
+Define custom data types:
+
+```tsx
+interface TaskData {
+  id: string;
+  title: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+function TaskCard(props: {task: TaskData}) {
+  const {ref, isDragging} = useDraggable<TaskData>({
+    id: props.task.id,
+    data: props.task,
+  });
+
+  return (
+    <div ref={ref}>
+      <h3>{props.task.title}</h3>
+      <span>Priority: {props.task.priority}</span>
+    </div>
+  );
+}
+```
+
+## Fine-Grained Reactivity
+
+Solid's fine-grained reactivity means updates are surgical:
+
+```tsx
+import {createSignal, createEffect} from 'solid-js';
+
+function DraggableCard(props) {
+  const [isDisabled, setIsDisabled] = createSignal(false);
+
+  const {ref, isDragging} = useDraggable({
+    id: props.id,
+    disabled: isDisabled(),
+  });
+
+  // Only runs when isDragging changes
+  createEffect(() => {
+    console.log('Dragging:', isDragging());
+  });
+
+  return (
+    <div ref={ref}>
+      {props.title}
+      <button onClick={() => setIsDisabled(!isDisabled())}>
+        {isDisabled() ? 'Enable' : 'Disable'}
+      </button>
+    </div>
+  );
+}
+```
+
+## Performance Optimization
+
+Leverage Solid's reactivity for optimal performance:
+
+```tsx
+import {For, createMemo} from 'solid-js';
+
+function OptimizedList(props) {
+  // Memoize expensive computations
+  const sortedItems = createMemo(() => {
+    return props.items().sort((a, b) => a.priority - b.priority);
+  });
+
+  return (
+    <For each={sortedItems()}>
+      {(item, index) => (
+        <SortableItem id={item.id} index={index()} data={item} />
+      )}
+    </For>
+  );
+}
+```
+
+## Best Practices
+
+- **Stable IDs**: Use consistent, unique IDs for draggables and droppables
+- **Signals**: Return getters (functions) for reactive state like `isDragging()`
+- **For component**: Always use `<For>` for lists to optimize reconciliation
+- **Memoization**: Use `createMemo` for expensive derived values
+- **Effects**: Use `createEffect` to respond to drag state changes
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sortable Lists" icon="list" href="/guides/sortable">
+    Build sortable lists with animations
+  </Card>
+  <Card title="Multiple Containers" icon="grid" href="/examples/multiple-containers">
+    Drag between multiple containers
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Configure interaction methods
+  </Card>
+  <Card title="Events" icon="bolt" href="/api/abstract/drag-drop-manager#events">
+    Handle drag and drop events
+  </Card>
+</CardGroup>

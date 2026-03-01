@@ -1,0 +1,559 @@
+---
+title: 'Droppable'
+description: 'Entities that can receive draggable items in drag and drop operations'
+---
+
+`Droppable` represents an entity that can receive draggable items in a drag and drop operation. It extends the base `Entity` class with droppable-specific functionality including type-based acceptance rules, collision detection, and drop target status tracking.
+
+## Constructor
+
+Creates a new droppable entity.
+
+```typescript
+const droppable = new Droppable<T, U>(input, manager);
+```
+
+<ParamField path="input" type="DroppableInput<T>" required>
+  Configuration object for the droppable.
+
+  <Expandable title="DroppableInput properties">
+    <ParamField path="id" type="UniqueIdentifier" required>
+      Unique identifier for this droppable entity.
+
+      ```typescript
+      id: 'zone-1'
+      // or
+      id: 456
+      ```
+    </ParamField>
+
+    <ParamField path="collisionDetector" type="CollisionDetector" required>
+      Function for determining collisions with draggables.
+
+      ```typescript
+      collisionDetector: rectangleIntersection
+      ```
+    </ParamField>
+
+    <ParamField path="accept" type="Type | Type[] | ((source: Draggable) => boolean)" optional>
+      Types of draggables that can be dropped here, or a function to determine compatibility.
+
+      ```typescript
+      // Accept specific type
+      accept: 'card'
+
+      // Accept multiple types
+      accept: ['card', 'widget']
+
+      // Custom acceptance logic
+      accept: (draggable) => draggable.data.category === 'allowed'
+      ```
+
+      If undefined, all draggables are accepted.
+    </ParamField>
+
+    <ParamField path="collisionPriority" type="CollisionPriority | number" optional>
+      Priority for collision detection. Higher priority collisions take precedence.
+
+      ```typescript
+      collisionPriority: CollisionPriority.High
+      // or custom numeric priority
+      collisionPriority: 100
+      ```
+    </ParamField>
+
+    <ParamField path="type" type="Type" optional>
+      Type/category for this droppable.
+
+      ```typescript
+      type: 'dropzone'
+      ```
+    </ParamField>
+
+    <ParamField path="data" type="T" optional>
+      Arbitrary data associated with this entity.
+
+      ```typescript
+      data: {
+        label: 'Drop here',
+        accepts: ['card', 'item'],
+        capacity: 10
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="disabled" type="boolean" default="false" optional>
+      Whether the entity should initially be disabled.
+    </ParamField>
+
+    <ParamField path="register" type="boolean" default="true" optional>
+      Whether to automatically register with the manager when created.
+    </ParamField>
+
+    <ParamField path="effects" type="() => Effect[]" optional>
+      Array of effects that are set up when registered and cleaned up when unregistered.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="manager" type="U | undefined" required>
+  The drag and drop manager instance, or undefined for unmanaged entities.
+</ParamField>
+
+<ParamField path="T" type="extends Data" default="Data">
+  Type parameter for the data associated with this droppable.
+</ParamField>
+
+<ParamField path="U" type="extends DragDropManager<any, any>" default="DragDropManager<any, any>">
+  Type parameter for the manager type.
+</ParamField>
+
+## Properties
+
+### Inherited from Entity
+
+<ParamField path="id" type="UniqueIdentifier">
+  The unique identifier of the entity. Can be updated dynamically.
+
+  ```typescript
+  droppable.id = 'new-zone-id';
+  ```
+</ParamField>
+
+<ParamField path="data" type="T" reactive>
+  The data associated with the entity.
+
+  ```typescript
+  droppable.data = {label: 'Updated label', capacity: 20};
+  ```
+</ParamField>
+
+<ParamField path="manager" type="U | undefined" reactive>
+  The drag and drop manager instance.
+
+  ```typescript
+  droppable.manager = newManager;
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean" reactive>
+  Whether the entity is disabled.
+
+  ```typescript
+  droppable.disabled = true;
+  ```
+</ParamField>
+
+### Droppable-Specific
+
+<ParamField path="accept" type="Type | Type[] | ((draggable: Draggable) => boolean) | undefined" reactive>
+  Types of draggables that can be dropped here, or a function to determine compatibility.
+
+  ```typescript
+  // Accept only 'card' type
+  droppable.accept = 'card';
+
+  // Accept multiple types
+  droppable.accept = ['card', 'widget'];
+
+  // Custom logic
+  droppable.accept = (draggable) => draggable.data.size <= 10;
+  ```
+</ParamField>
+
+<ParamField path="type" type="Type | undefined" reactive>
+  The type/category of the droppable entity.
+
+  ```typescript
+  droppable.type = 'container';
+  ```
+</ParamField>
+
+<ParamField path="collisionDetector" type="CollisionDetector" reactive>
+  The collision detector for this droppable.
+
+  ```typescript
+  droppable.collisionDetector = closestCenter;
+  ```
+</ParamField>
+
+<ParamField path="collisionPriority" type="CollisionPriority | number | undefined" reactive>
+  The collision priority for this droppable.
+
+  ```typescript
+  droppable.collisionPriority = CollisionPriority.Highest;
+  ```
+</ParamField>
+
+<ParamField path="shape" type="Shape | undefined" reactive>
+  The current shape of this droppable. Typically set automatically based on DOM measurements.
+
+  ```typescript
+  droppable.shape = new Rectangle({
+    x: 0,
+    y: 0,
+    width: 200,
+    height: 100
+  });
+  ```
+</ParamField>
+
+## Computed Properties
+
+### isDropTarget
+
+<ParamField path="isDropTarget" type="boolean" derived>
+  Checks if this droppable is the current drop target.
+
+  ```typescript
+  if (droppable.isDropTarget) {
+    console.log('Draggable is over this zone');
+  }
+  ```
+
+  Returns `true` if this droppable's ID matches the current drag operation's target ID.
+</ParamField>
+
+## Methods
+
+### accepts()
+
+Checks whether this droppable accepts a given draggable.
+
+```typescript
+const canDrop = droppable.accepts(draggable);
+```
+
+<ParamField path="draggable" type="Draggable" required>
+  The draggable to check compatibility for.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if the draggable can be dropped here, `false` otherwise.
+</ResponseField>
+
+**Logic:**
+1. If `accept` is undefined, returns `true` (accepts all)
+2. If `accept` is a function, calls it with the draggable
+3. If draggable has no type, returns `false`
+4. If `accept` is an array, checks if it includes the draggable's type
+5. If `accept` is a single type, checks for exact match
+
+### Inherited from Entity
+
+### register()
+
+Registers the entity with its manager.
+
+```typescript
+const cleanup = droppable.register();
+```
+
+<ResponseField name="return" type="CleanupFunction | void">
+  A cleanup function to unregister the entity, or void if no manager is set.
+</ResponseField>
+
+### unregister()
+
+Unregisters the entity from its manager.
+
+```typescript
+droppable.unregister();
+```
+
+### destroy()
+
+Cleans up the entity when it's no longer needed.
+
+```typescript
+droppable.destroy();
+```
+
+## Usage Examples
+
+### Basic Droppable
+
+```typescript
+import {Droppable, DragDropManager} from '@dnd-kit/abstract';
+import {rectangleIntersection} from '@dnd-kit/collision';
+
+const manager = new DragDropManager();
+
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    collisionDetector: rectangleIntersection,
+    data: {label: 'Drop here'}
+  },
+  manager
+);
+```
+
+### With Type Acceptance
+
+```typescript
+// Accept only 'card' type draggables
+const droppable = new Droppable(
+  {
+    id: 'card-zone',
+    accept: 'card',
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// Accept multiple types
+const multiDroppable = new Droppable(
+  {
+    id: 'multi-zone',
+    accept: ['card', 'widget', 'item'],
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+```
+
+### With Custom Acceptance Logic
+
+```typescript
+const droppable = new Droppable(
+  {
+    id: 'smart-zone',
+    accept: (draggable) => {
+      // Only accept if priority is high
+      if (draggable.data.priority !== 'high') {
+        return false;
+      }
+      
+      // Check capacity
+      const currentItems = droppable.data.items?.length ?? 0;
+      return currentItems < droppable.data.capacity;
+    },
+    collisionDetector: rectangleIntersection,
+    data: {capacity: 5, items: []}
+  },
+  manager
+);
+```
+
+### With Collision Priority
+
+```typescript
+import {CollisionPriority} from '@dnd-kit/abstract';
+
+const highPriorityZone = new Droppable(
+  {
+    id: 'priority-zone',
+    collisionPriority: CollisionPriority.Highest,
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// Custom numeric priority
+const customPriorityZone = new Droppable(
+  {
+    id: 'custom-zone',
+    collisionPriority: 999,
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+```
+
+### Checking Acceptance
+
+```typescript
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    accept: 'card',
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+const cardDraggable = new Draggable({id: 'item-1', type: 'card'}, manager);
+const widgetDraggable = new Draggable({id: 'item-2', type: 'widget'}, manager);
+
+console.log(droppable.accepts(cardDraggable));   // true
+console.log(droppable.accepts(widgetDraggable)); // false
+```
+
+### Checking Drop Target Status
+
+```typescript
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// During a drag operation
+if (droppable.isDropTarget) {
+  console.log('A draggable is hovering over this zone');
+  // Update UI, show highlight, etc.
+}
+```
+
+### Dynamic Updates
+
+```typescript
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    accept: 'card',
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// Change accepted types
+droppable.accept = ['card', 'widget'];
+
+// Disable temporarily
+droppable.disabled = true;
+
+// Update collision priority
+droppable.collisionPriority = CollisionPriority.High;
+
+// Update data
+droppable.data = {
+  ...droppable.data,
+  capacity: 20
+};
+```
+
+### TypeScript Types
+
+```typescript
+interface DropZoneData {
+  label: string;
+  category: string;
+  capacity: number;
+  items: string[];
+}
+
+const droppable = new Droppable<DropZoneData>(
+  {
+    id: 'zone-1',
+    collisionDetector: rectangleIntersection,
+    data: {
+      label: 'Todo',
+      category: 'tasks',
+      capacity: 10,
+      items: []
+    }
+  },
+  manager
+);
+
+// TypeScript knows the shape of data
+const capacity = droppable.data.capacity; // number
+const items = droppable.data.items;       // string[]
+```
+
+### With Custom Collision Detector
+
+```typescript
+import type {CollisionDetector} from '@dnd-kit/abstract';
+
+const customCollisionDetector: CollisionDetector = ({droppable, dragOperation}) => {
+  const {source} = dragOperation;
+  if (!source?.shape || !droppable.shape) return null;
+
+  // Custom collision logic
+  const overlap = calculateOverlap(source.shape, droppable.shape);
+  
+  if (overlap > 0) {
+    return {
+      id: droppable.id,
+      type: CollisionType.ShapeIntersection,
+      priority: CollisionPriority.Normal,
+      value: overlap,
+      data: {overlap}
+    };
+  }
+
+  return null;
+};
+
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    collisionDetector: customCollisionDetector
+  },
+  manager
+);
+```
+
+### Monitoring Drop Events
+
+```typescript
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    collisionDetector: rectangleIntersection,
+    data: {items: []}
+  },
+  manager
+);
+
+manager.monitor.addEventListener('dragend', (event) => {
+  if (event.operation.target?.id === droppable.id) {
+    const draggedItem = event.operation.source;
+    console.log(`Item ${draggedItem?.id} was dropped on zone ${droppable.id}`);
+    
+    // Update data
+    droppable.data.items.push(draggedItem?.id);
+  }
+});
+```
+
+### Nested Droppables
+
+```typescript
+// Parent container with low priority
+const parentZone = new Droppable(
+  {
+    id: 'parent',
+    collisionPriority: CollisionPriority.Low,
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// Child zone with higher priority
+const childZone = new Droppable(
+  {
+    id: 'child',
+    collisionPriority: CollisionPriority.High,
+    collisionDetector: rectangleIntersection
+  },
+  manager
+);
+
+// Child will be preferred when both overlap
+```
+
+## CollisionPriority Enum
+
+```typescript
+enum CollisionPriority {
+  Lowest = 0,
+  Low = 1,
+  Normal = 2,
+  High = 3,
+  Highest = 4,
+}
+```
+
+Higher priority droppables take precedence when multiple collisions are detected.
+
+## See Also
+
+- [DragDropManager](/api/abstract/drag-drop-manager) - Managing drag operations
+- [Draggable](/api/abstract/draggable) - Creating draggable items
+- [Collision Detection](/guides/collision-detection) - Implementing collision detectors

@@ -1,0 +1,344 @@
+---
+title: Helper Utilities
+description: API reference for helper functions in dnd-kit
+---
+
+The helpers package provides utility functions for common drag and drop operations, particularly for managing array and list mutations.
+
+## move
+
+Moves items in an array or grouped record based on drag and drop events, intelligently handling both simple arrays and grouped data structures.
+
+```typescript
+function move<T extends Items | Record<UniqueIdentifier, Items>>(
+  items: T,
+  event: DragDropEvent
+): T
+```
+
+### Parameters
+
+<ParamField path="items" type="Items | Record<UniqueIdentifier, Items>" required>
+  The items to reorder. Can be:
+  - An array of identifiers: `UniqueIdentifier[]`
+  - An array of objects with `id` properties: `{id: UniqueIdentifier}[]`
+  - A record of groups, each containing an array of items: `Record<UniqueIdentifier, Items>`
+</ParamField>
+
+<ParamField path="event" type="DragDropEvent" required>
+  A `dragover` or `dragend` event from the DragDropManager containing source and target information
+</ParamField>
+
+### Returns
+
+<ResponseField name="items" type="T">
+  A new array or record with items moved to their new positions. Returns the original items unchanged if the operation is invalid or canceled.
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {move} from '@dnd-kit/helpers';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Simple array of IDs
+const items = ['item-1', 'item-2', 'item-3'];
+
+const manager = new DragDropManager();
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newItems = move(items, event);
+  console.log(newItems);
+  // ['item-2', 'item-1', 'item-3'] - if item-2 was moved before item-1
+});
+
+// Array of objects
+const tasks = [
+  {id: 'task-1', title: 'First task'},
+  {id: 'task-2', title: 'Second task'},
+  {id: 'task-3', title: 'Third task'},
+];
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newTasks = move(tasks, event);
+  // Objects are moved to new positions
+});
+
+// Grouped data (e.g., Kanban board)
+const columns = {
+  'todo': ['task-1', 'task-2'],
+  'in-progress': ['task-3'],
+  'done': ['task-4', 'task-5'],
+};
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newColumns = move(columns, event);
+  // Handles both within-group reordering and cross-group transfers
+});
+```
+
+### Behavior
+
+- **Simple Arrays**: Moves the source item to the target position
+- **Grouped Records**: Handles both reordering within a group and moving items between groups
+- **Optimistic Updates**: Reconciles optimistic UI updates with actual data positions
+- **Invalid Operations**: Returns original items unchanged and calls `event.preventDefault()` if:
+  - Source or target is missing
+  - Operation was canceled
+  - Indices are out of bounds
+  - Source equals target with no actual movement
+
+---
+
+## swap
+
+Swaps two items in an array or grouped record based on drag and drop events.
+
+```typescript
+function swap<T extends Items | Record<UniqueIdentifier, Items>>(
+  items: T,
+  event: DragDropEvent
+): T
+```
+
+### Parameters
+
+<ParamField path="items" type="Items | Record<UniqueIdentifier, Items>" required>
+  The items to reorder. Can be:
+  - An array of identifiers: `UniqueIdentifier[]`
+  - An array of objects with `id` properties: `{id: UniqueIdentifier}[]`
+  - A record of groups, each containing an array of items: `Record<UniqueIdentifier, Items>`
+</ParamField>
+
+<ParamField path="event" type="DragDropEvent" required>
+  A `dragover` or `dragend` event from the DragDropManager containing source and target information
+</ParamField>
+
+### Returns
+
+<ResponseField name="items" type="T">
+  A new array or record with items swapped. Returns the original items unchanged if the operation is invalid or canceled.
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {swap} from '@dnd-kit/helpers';
+import {DragDropManager} from '@dnd-kit/dom';
+
+const items = ['A', 'B', 'C', 'D'];
+
+const manager = new DragDropManager();
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newItems = swap(items, event);
+  // If 'A' was dragged onto 'C': ['C', 'B', 'A', 'D']
+  // The items at source and target positions are swapped
+});
+```
+
+### Difference from move
+
+- **move**: Shifts items between positions (inserting at target)
+- **swap**: Exchanges the items at source and target positions
+
+```typescript
+// Before: ['A', 'B', 'C', 'D']
+// Drag 'A' (index 0) to 'C' (index 2)
+
+move(items, event)  // ['B', 'C', 'A', 'D'] - A inserted at C's position
+swap(items, event)  // ['C', 'B', 'A', 'D'] - A and C swapped positions
+```
+
+---
+
+## arrayMove
+
+Moves an array item to a different position. Returns a new array with the item moved to the new position.
+
+```typescript
+function arrayMove<T extends any[]>(
+  array: T,
+  from: number,
+  to: number
+): T
+```
+
+### Parameters
+
+<ParamField path="array" type="T extends any[]" required>
+  The source array
+</ParamField>
+
+<ParamField path="from" type="number" required>
+  The source index
+</ParamField>
+
+<ParamField path="to" type="number" required>
+  The target index
+</ParamField>
+
+### Returns
+
+<ResponseField name="array" type="T">
+  A new array with the item moved. Returns the original array if `from === to`.
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {arrayMove} from '@dnd-kit/helpers';
+
+const items = ['A', 'B', 'C', 'D', 'E'];
+
+const result = arrayMove(items, 0, 3);
+// ['B', 'C', 'D', 'A', 'E']
+
+const result2 = arrayMove(items, 4, 1);
+// ['A', 'E', 'B', 'C', 'D']
+```
+
+---
+
+## arraySwap
+
+Swaps two items in an array. Returns a new array with the items swapped.
+
+```typescript
+function arraySwap<T extends any[]>(
+  array: T,
+  from: number,
+  to: number
+): T
+```
+
+### Parameters
+
+<ParamField path="array" type="T extends any[]" required>
+  The source array
+</ParamField>
+
+<ParamField path="from" type="number" required>
+  The first index
+</ParamField>
+
+<ParamField path="to" type="number" required>
+  The second index
+</ParamField>
+
+### Returns
+
+<ResponseField name="array" type="T">
+  A new array with the items swapped. Returns the original array if `from === to`.
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {arraySwap} from '@dnd-kit/helpers';
+
+const items = ['A', 'B', 'C', 'D', 'E'];
+
+const result = arraySwap(items, 0, 3);
+// ['D', 'B', 'C', 'A', 'E']
+
+const result2 = arraySwap(items, 1, 4);
+// ['A', 'E', 'C', 'D', 'B']
+```
+
+---
+
+## Types
+
+### UniqueIdentifier
+
+```typescript
+type UniqueIdentifier = string | number;
+```
+
+### Items
+
+```typescript
+type Items = UniqueIdentifier[] | {id: UniqueIdentifier}[];
+```
+
+### DragDropEvent
+
+```typescript
+type DragDropEvent = 
+  | DragDropEventMap['dragover'] 
+  | DragDropEventMap['dragend'];
+
+interface DragDropEventMap {
+  dragover: {
+    operation: {
+      source: Draggable;
+      target: Droppable;
+      canceled: boolean;
+    };
+    preventDefault(): void;
+  };
+  dragend: {
+    operation: {
+      source: Draggable;
+      target: Droppable;
+      canceled: boolean;
+    };
+    preventDefault(): void;
+  };
+}
+```
+
+## Best Practices
+
+### Using with dragover events
+
+For real-time reordering during drag:
+
+```typescript
+const [items, setItems] = useState(['A', 'B', 'C']);
+
+manager.monitor.addEventListener('dragover', (event) => {
+  setItems(move(items, event));
+});
+```
+
+### Using with dragend events
+
+For committing changes only after drop:
+
+```typescript
+const [items, setItems] = useState(['A', 'B', 'C']);
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newItems = move(items, event);
+  setItems(newItems);
+  // Save to backend, etc.
+});
+```
+
+### Handling grouped data
+
+```typescript
+const [columns, setColumns] = useState({
+  todo: [{id: '1', title: 'Task 1'}],
+  done: [{id: '2', title: 'Task 2'}],
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const newColumns = move(columns, event);
+  setColumns(newColumns);
+});
+```
+
+### Preventing unwanted mutations
+
+The helper functions return new arrays/objects, so your original data remains unchanged:
+
+```typescript
+const original = ['A', 'B', 'C'];
+const modified = arrayMove(original, 0, 2);
+
+console.log(original);  // ['A', 'B', 'C'] - unchanged
+console.log(modified);  // ['B', 'C', 'A'] - new array
+```

@@ -1,0 +1,664 @@
+---
+title: State Management
+description: API reference for state management utilities in dnd-kit
+---
+
+The state package provides reactive state management utilities built on top of Preact Signals, including signals, computed values, effects, decorators, and history tracking.
+
+## Core Functions
+
+### signal
+
+Creates a reactive signal that can be subscribed to. Re-exported from `@preact/signals-core`.
+
+```typescript
+function signal<T>(value: T): Signal<T>
+```
+
+<ParamField path="value" type="T" required>
+  The initial value
+</ParamField>
+
+<ResponseField name="signal" type="Signal<T>">
+  A signal object with `.value` property and `.peek()` method
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {signal} from '@dnd-kit/state';
+
+const count = signal(0);
+
+console.log(count.value); // 0
+
+count.value = 5;
+console.log(count.value); // 5
+
+// Peek without subscribing
+console.log(count.peek()); // 5
+```
+
+---
+
+### computed
+
+Creates a computed signal that automatically updates when its dependencies change.
+
+```typescript
+function computed<T>(
+  compute: () => T,
+  comparator?: (a: T, b: T) => boolean
+): ReadonlySignal<T>
+```
+
+<ParamField path="compute" type="() => T" required>
+  Function that computes the value
+</ParamField>
+
+<ParamField path="comparator" type="(a: T, b: T) => boolean">
+  Optional equality comparator to prevent unnecessary updates
+</ParamField>
+
+<ResponseField name="computed" type="ReadonlySignal<T>">
+  A readonly signal that updates when dependencies change
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {signal, computed} from '@dnd-kit/state';
+
+const width = signal(100);
+const height = signal(50);
+
+const area = computed(() => width.value * height.value);
+console.log(area.value); // 5000
+
+width.value = 200;
+console.log(area.value); // 10000 - automatically updated
+
+// With custom comparator
+const items = signal([1, 2, 3]);
+const doubled = computed(
+  () => items.value.map(x => x * 2),
+  (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
+);
+```
+
+---
+
+### effect
+
+Runs a side effect function whenever its dependencies change. Re-exported from `@preact/signals-core`.
+
+```typescript
+function effect(fn: () => void | CleanupFunction): () => void
+```
+
+<ParamField path="fn" type="() => void | CleanupFunction" required>
+  Effect function that runs when dependencies change. Can optionally return a cleanup function.
+</ParamField>
+
+<ResponseField name="dispose" type="() => void">
+  A function to stop the effect and run cleanup
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {signal, effect} from '@dnd-kit/state';
+
+const name = signal('Alice');
+
+const dispose = effect(() => {
+  console.log(`Hello, ${name.value}!`);
+  
+  // Optional cleanup
+  return () => {
+    console.log('Cleaning up...');
+  };
+});
+// Logs: "Hello, Alice!"
+
+name.value = 'Bob';
+// Logs: "Cleaning up..."
+// Logs: "Hello, Bob!"
+
+dispose();
+// Logs: "Cleaning up..."
+// Effect is now stopped
+```
+
+---
+
+### effects
+
+Runs multiple effects and returns a single cleanup function.
+
+```typescript
+function effects(...entries: Effect[]): CleanupFunction
+```
+
+<ParamField path="entries" type="Effect[]" required>
+  Multiple effect functions to run
+</ParamField>
+
+<ResponseField name="cleanup" type="CleanupFunction">
+  A function that cleans up all effects
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {signal, effects} from '@dnd-kit/state';
+
+const x = signal(0);
+const y = signal(0);
+
+const cleanup = effects(
+  () => console.log(`x: ${x.value}`),
+  () => console.log(`y: ${y.value}`),
+  () => console.log(`sum: ${x.value + y.value}`)
+);
+
+x.value = 5;
+// Logs: "x: 5"
+// Logs: "sum: 5"
+
+cleanup();
+// All effects stopped
+```
+
+---
+
+### batch
+
+Batches multiple signal updates to prevent unnecessary re-renders. Re-exported from `@preact/signals-core`.
+
+```typescript
+function batch(fn: () => void): void
+```
+
+<ParamField path="fn" type="() => void" required>
+  Function that performs multiple signal updates
+</ParamField>
+
+### Usage Example
+
+```typescript
+import {signal, batch, computed} from '@dnd-kit/state';
+
+const firstName = signal('John');
+const lastName = signal('Doe');
+
+const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+
+let computeCount = 0;
+effect(() => {
+  fullName.value;
+  computeCount++;
+});
+
+// Without batch: triggers 2 computations
+firstName.value = 'Jane';
+lastName.value = 'Smith';
+// computeCount: 2
+
+// With batch: triggers 1 computation
+batch(() => {
+  firstName.value = 'Alice';
+  lastName.value = 'Johnson';
+});
+// computeCount: 3 (only one additional computation)
+```
+
+---
+
+### untracked
+
+Reads a signal value without subscribing to it. Re-exported from `@preact/signals-core`.
+
+```typescript
+function untracked<T>(fn: () => T): T
+```
+
+<ParamField path="fn" type="() => T" required>
+  Function that reads signals
+</ParamField>
+
+<ResponseField name="result" type="T">
+  The return value of the function
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {signal, computed, untracked} from '@dnd-kit/state';
+
+const a = signal(1);
+const b = signal(2);
+
+const sum = computed(() => {
+  // This computed will only depend on 'a'
+  const aValue = a.value;
+  const bValue = untracked(() => b.value);
+  return aValue + bValue;
+});
+
+console.log(sum.value); // 3
+
+a.value = 10;
+console.log(sum.value); // 12 - recomputed
+
+b.value = 20;
+console.log(sum.value); // 12 - NOT recomputed (b is untracked)
+```
+
+---
+
+## Decorators
+
+### @reactive
+
+Decorator that makes a class accessor reactive using signals.
+
+```typescript
+function reactive<This, Value>(
+  target: ClassAccessorDecoratorTarget<This, Value>,
+  context: ClassAccessorDecoratorContext<This, Value>
+): ClassAccessorDecoratorResult<This, Value>
+```
+
+### Usage Example
+
+```typescript
+import {reactive} from '@dnd-kit/state';
+
+class Counter {
+  @reactive
+  accessor count = 0;
+  
+  increment() {
+    this.count++;
+  }
+}
+
+const counter = new Counter();
+
+effect(() => {
+  console.log(counter.count);
+});
+// Logs: 0
+
+counter.increment();
+// Logs: 1
+```
+
+---
+
+### @derived
+
+Decorator that makes a getter computed, caching its result and only recomputing when dependencies change.
+
+```typescript
+function derived<This, Return>(
+  target: (this: This) => Return,
+  context: ClassGetterDecoratorContext<This, Return>
+): (this: This) => Return
+```
+
+### Usage Example
+
+```typescript
+import {reactive, derived} from '@dnd-kit/state';
+
+class Rectangle {
+  @reactive
+  accessor width = 100;
+  
+  @reactive
+  accessor height = 50;
+  
+  @derived
+  get area() {
+    return this.width * this.height;
+  }
+}
+
+const rect = new Rectangle();
+
+console.log(rect.area); // 5000
+
+rect.width = 200;
+console.log(rect.area); // 10000 - automatically recomputed
+```
+
+---
+
+### @enumerable
+
+Decorator that controls whether a property is enumerable.
+
+```typescript
+function enumerable(enumerable?: boolean): PropertyDecorator
+```
+
+<ParamField path="enumerable" type="boolean" default="true">
+  Whether the property should be enumerable
+</ParamField>
+
+### Usage Example
+
+```typescript
+import {enumerable} from '@dnd-kit/state';
+
+class Example {
+  public visible = 'shown';
+  
+  @enumerable(false)
+  public hidden = 'not shown';
+}
+
+const obj = new Example();
+
+console.log(Object.keys(obj));
+// ['visible'] - 'hidden' is not enumerable
+
+for (const key in obj) {
+  console.log(key); // Only 'visible'
+}
+```
+
+---
+
+## Utilities
+
+### deepEqual
+
+Performs deep equality comparison between two values.
+
+```typescript
+function deepEqual<T>(a: T, b: T): boolean
+```
+
+<ParamField path="a" type="T" required>
+  First value
+</ParamField>
+
+<ParamField path="b" type="T" required>
+  Second value
+</ParamField>
+
+<ResponseField name="equal" type="boolean">
+  True if values are deeply equal
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {deepEqual} from '@dnd-kit/state';
+
+deepEqual({a: 1, b: 2}, {a: 1, b: 2}); // true
+deepEqual([1, 2, 3], [1, 2, 3]); // true
+deepEqual(new Set([1, 2]), new Set([1, 2])); // true
+deepEqual({a: {b: 1}}, {a: {b: 2}}); // false
+
+// Use with computed
+const data = signal({items: [1, 2, 3]});
+const processed = computed(
+  () => ({items: data.value.items.map(x => x * 2)}),
+  deepEqual
+);
+```
+
+---
+
+### snapshot
+
+Creates a plain object snapshot of a reactive object without triggering subscriptions.
+
+```typescript
+function snapshot<T extends object>(value: T): T
+```
+
+<ParamField path="value" type="T extends object" required>
+  The reactive object to snapshot
+</ParamField>
+
+<ResponseField name="snapshot" type="T">
+  A plain object copy with all enumerable properties
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {snapshot, reactive} from '@dnd-kit/state';
+
+class State {
+  @reactive
+  accessor x = 10;
+  
+  @reactive
+  accessor y = 20;
+}
+
+const state = new State();
+const snap = snapshot(state);
+
+console.log(snap); // {x: 10, y: 20}
+
+// Snapshot is a plain object
+console.log(snap instanceof State); // false
+```
+
+---
+
+## Advanced Utilities
+
+### ValueHistory
+
+A class that tracks current, previous, and initial values with reactive updates.
+
+```typescript
+class ValueHistory<T> implements WithHistory<T> {
+  constructor(
+    defaultValue: T,
+    equals?: (a: T, b: T) => boolean
+  )
+}
+```
+
+<ParamField path="defaultValue" type="T" required>
+  The default/initial value
+</ParamField>
+
+<ParamField path="equals" type="(a: T, b: T) => boolean" default="Object.is">
+  Equality comparator for detecting changes
+</ParamField>
+
+### Properties
+
+<ResponseField name="current" type="T">
+  The current value (reactive)
+</ResponseField>
+
+<ResponseField name="previous" type="T | undefined">
+  The previous value, or undefined if not yet changed (reactive)
+</ResponseField>
+
+<ResponseField name="initial" type="T">
+  The initial value (reactive)
+</ResponseField>
+
+### Methods
+
+#### reset
+
+Resets to the default value or a new value.
+
+```typescript
+reset(value?: T): void
+```
+
+### Usage Example
+
+```typescript
+import {ValueHistory} from '@dnd-kit/state';
+
+const history = new ValueHistory(0);
+
+console.log(history.current);  // 0
+console.log(history.previous); // undefined
+
+history.current = 5;
+console.log(history.current);  // 5
+console.log(history.previous); // 0
+
+history.current = 10;
+console.log(history.current);  // 10
+console.log(history.previous); // 5
+console.log(history.initial);  // 0
+
+history.reset();
+console.log(history.current);  // 0
+console.log(history.previous); // undefined
+```
+
+---
+
+### WeakStore
+
+A weak reference store that associates values with object keys and identifiers.
+
+```typescript
+class WeakStore<
+  WeakKey extends object,
+  Key extends string | number | symbol,
+  Value extends Record<Key, any>
+>
+```
+
+### Methods
+
+#### get
+
+Retrieves a value from the store.
+
+```typescript
+get(key: WeakKey | undefined, id: Key): Value | undefined
+```
+
+<ParamField path="key" type="WeakKey | undefined" required>
+  The weak key (object reference)
+</ParamField>
+
+<ParamField path="id" type="Key" required>
+  The identifier within that key's map
+</ParamField>
+
+<ResponseField name="value" type="Value | undefined">
+  The stored value, or undefined if not found
+</ResponseField>
+
+#### set
+
+Stores a value in the store.
+
+```typescript
+set(key: WeakKey | undefined, id: Key, value: Value): void
+```
+
+<ParamField path="key" type="WeakKey | undefined" required>
+  The weak key (object reference)
+</ParamField>
+
+<ParamField path="id" type="Key" required>
+  The identifier within that key's map
+</ParamField>
+
+<ParamField path="value" type="Value" required>
+  The value to store
+</ParamField>
+
+#### clear
+
+Clears all values associated with a key.
+
+```typescript
+clear(key: WeakKey | undefined): void
+```
+
+<ParamField path="key" type="WeakKey | undefined" required>
+  The weak key to clear
+</ParamField>
+
+### Usage Example
+
+```typescript
+import {WeakStore} from '@dnd-kit/state';
+
+const store = new WeakStore<object, string, {data: string}>();
+
+const obj1 = {};
+const obj2 = {};
+
+store.set(obj1, 'item-1', {data: 'value1'});
+store.set(obj1, 'item-2', {data: 'value2'});
+store.set(obj2, 'item-1', {data: 'value3'});
+
+console.log(store.get(obj1, 'item-1')); // {data: 'value1'}
+console.log(store.get(obj2, 'item-1')); // {data: 'value3'}
+
+store.clear(obj1);
+console.log(store.get(obj1, 'item-1')); // undefined
+
+// When obj1 and obj2 are garbage collected,
+// their associated data is automatically freed
+```
+
+---
+
+## Types
+
+### Signal
+
+```typescript
+interface Signal<T> {
+  value: T;
+  peek(): T;
+  subscribe(fn: (value: T) => void): () => void;
+}
+```
+
+### ReadonlySignal
+
+```typescript
+interface ReadonlySignal<T> {
+  readonly value: T;
+  peek(): T;
+  subscribe(fn: (value: T) => void): () => void;
+}
+```
+
+### Effect
+
+```typescript
+type Effect = () => void | CleanupFunction;
+```
+
+### CleanupFunction
+
+```typescript
+type CleanupFunction = () => void;
+```
+
+### WithHistory
+
+```typescript
+type WithHistory<T> = {
+  current: T;
+  initial: T;
+  previous: T | undefined;
+};
+```

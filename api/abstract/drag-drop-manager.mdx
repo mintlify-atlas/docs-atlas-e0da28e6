@@ -1,0 +1,478 @@
+---
+title: 'DragDropManager'
+description: 'Central orchestrator for drag and drop operations'
+---
+
+`DragDropManager` is the core class that orchestrates all drag and drop operations. It manages entities, coordinates sensors and modifiers, handles collision detection, and dispatches events throughout the drag lifecycle.
+
+## Constructor
+
+Creates a new drag and drop manager instance.
+
+```typescript
+const manager = new DragDropManager<T, U>(config?);
+```
+
+<ParamField path="config" type="DragDropManagerInput<T, U>" optional>
+  Configuration object for the manager.
+
+  <Expandable title="DragDropManagerInput properties">
+    <ParamField path="plugins" type="Customizable<Plugins<T>>" optional>
+      Array of plugin constructors or descriptors to extend functionality.
+      Can be a direct array or a function that receives default plugins.
+
+      ```typescript
+      // Direct array (replaces defaults)
+      plugins: [MyPlugin, AnotherPlugin]
+
+      // Function (extends defaults)
+      plugins: (defaults) => [...defaults, MyPlugin]
+      ```
+    </ParamField>
+
+    <ParamField path="sensors" type="Customizable<Sensors<T>>" optional>
+      Array of sensor constructors or descriptors for handling input.
+      Can be a direct array or a function that receives default sensors.
+
+      ```typescript
+      sensors: [PointerSensor, KeyboardSensor]
+      ```
+    </ParamField>
+
+    <ParamField path="modifiers" type="Customizable<Modifiers<T>>" optional>
+      Array of modifier constructors or descriptors for transforming drag behavior.
+      Can be a direct array or a function that receives default modifiers.
+
+      ```typescript
+      modifiers: [SnapModifier, RestrictToWindowModifier]
+      ```
+    </ParamField>
+
+    <ParamField path="renderer" type="Renderer" optional>
+      Custom renderer for handling visual updates during drag operations.
+
+      ```typescript
+      renderer: {
+        rendering: Promise.resolve()
+      }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="T" type="extends Draggable">
+  Type parameter for draggable entities.
+</ParamField>
+
+<ParamField path="U" type="extends Droppable">
+  Type parameter for droppable entities.
+</ParamField>
+
+## Properties
+
+### actions
+
+<ParamField path="actions" type="DragActions<T, U, DragDropManager<T, U>>" readonly>
+  Actions that can be performed during drag operations.
+
+  <Expandable title="Available actions">
+    - `start(args)` - Start a new drag operation
+    - `move(args)` - Move the dragged entity
+    - `stop(args)` - Stop the current drag operation
+    - `setDragSource(source)` - Set the drag source
+    - `setDropTarget(identifier)` - Set the drop target
+  </Expandable>
+</ParamField>
+
+See [DragActions](#dragactions) for detailed action methods.
+
+### collisionObserver
+
+<ParamField path="collisionObserver" type="CollisionObserver<T, U>" readonly>
+  Observes and manages collision detection between draggable and droppable entities.
+</ParamField>
+
+### dragOperation
+
+<ParamField path="dragOperation" type="DragOperation<T, U>" readonly>
+  Tracks the current drag operation state and metadata.
+
+  <Expandable title="DragOperation properties">
+    - `source` - The draggable being dragged
+    - `target` - The droppable being targeted
+    - `status` - Current operation status
+    - `position` - Current position with history
+    - `transform` - Current transform coordinates
+    - `shape` - Current shape with history
+    - `activatorEvent` - Event that initiated the drag
+    - `canceled` - Whether the operation was canceled
+    - `modifiers` - Active modifiers
+  </Expandable>
+</ParamField>
+
+### monitor
+
+<ParamField path="monitor" type="DragDropMonitor<T, U, DragDropManager<T, U>>" readonly>
+  Monitors and emits drag and drop events.
+
+  ```typescript
+  manager.monitor.addEventListener('dragstart', (event, manager) => {
+    console.log('Started dragging:', event.operation.source);
+  });
+  ```
+</ParamField>
+
+### registry
+
+<ParamField path="registry" type="DragDropRegistry<T, U, DragDropManager<T, U>>" readonly>
+  Registry that manages draggable and droppable entities, as well as sensors, modifiers, and plugins.
+</ParamField>
+
+### renderer
+
+<ParamField path="renderer" type="Renderer" readonly>
+  Handles rendering of drag and drop visual feedback.
+</ParamField>
+
+### plugins
+
+<ParamField path="plugins" type="Plugin<any>[]">
+  Gets or sets the list of active plugins.
+
+  ```typescript
+  // Get active plugins
+  const activePlugins = manager.plugins;
+
+  // Set plugins
+  manager.plugins = [NewPlugin, AnotherPlugin];
+  ```
+</ParamField>
+
+### modifiers
+
+<ParamField path="modifiers" type="Modifier<any>[]">
+  Gets or sets the list of active modifiers.
+
+  ```typescript
+  // Get active modifiers
+  const activeModifiers = manager.modifiers;
+
+  // Set modifiers
+  manager.modifiers = [SnapModifier];
+  ```
+</ParamField>
+
+### sensors
+
+<ParamField path="sensors" type="Sensor<any>[]">
+  Gets or sets the list of active sensors.
+
+  ```typescript
+  // Get active sensors
+  const activeSensors = manager.sensors;
+
+  // Set sensors
+  manager.sensors = [PointerSensor, KeyboardSensor];
+  ```
+</ParamField>
+
+## Methods
+
+### destroy()
+
+Cleans up resources and stops any active drag operations.
+
+```typescript
+manager.destroy();
+```
+
+<ResponseField name="return" type="void">
+  No return value.
+</ResponseField>
+
+This method:
+- Stops any active drag operation (marking it as canceled)
+- Destroys all active modifiers
+- Unregisters all entities
+- Cleans up the collision observer
+
+## DragActions
+
+The `actions` property provides methods for controlling drag operations:
+
+### start()
+
+Starts a new drag operation.
+
+```typescript
+const controller = manager.actions.start({
+  source: draggableId,
+  coordinates: {x: 0, y: 0},
+  event: mouseEvent
+});
+```
+
+<ParamField path="args" type="object" required>
+  Configuration for the drag operation.
+
+  <Expandable title="Arguments">
+    <ParamField path="source" type="T | UniqueIdentifier" optional>
+      The source draggable entity or its identifier. If not provided, must be set via `setDragSource` first.
+    </ParamField>
+
+    <ParamField path="coordinates" type="Coordinates" required>
+      The initial coordinates of the drag operation.
+
+      ```typescript
+      {x: number, y: number}
+      ```
+    </ParamField>
+
+    <ParamField path="event" type="Event" optional>
+      The native event that initiated the drag (e.g., mousedown, touchstart).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="AbortController">
+  An AbortController that can be used to cancel the drag operation.
+</ResponseField>
+
+**Throws:**
+- `Error` if no drag source is set
+- `Error` if another operation is already active
+
+**Events dispatched:**
+1. `beforedragstart` (preventable) - Before initialization
+2. `dragstart` - After initialization completes
+
+### move()
+
+Moves the dragged entity to a new position.
+
+```typescript
+manager.actions.move({
+  by: {x: 10, y: 5},
+  event: mouseMoveEvent
+});
+```
+
+<ParamField path="args" type="object" required>
+  Configuration for the move operation.
+
+  <Expandable title="Arguments">
+    <ParamField path="by" type="Coordinates" optional>
+      Relative coordinates to move by.
+
+      ```typescript
+      by: {x: 10, y: 5} // Move 10px right, 5px down
+      ```
+    </ParamField>
+
+    <ParamField path="to" type="Coordinates" optional>
+      Absolute coordinates to move to.
+
+      ```typescript
+      to: {x: 100, y: 200} // Move to position (100, 200)
+      ```
+    </ParamField>
+
+    <ParamField path="event" type="Event" optional>
+      The native event that triggered the move.
+    </ParamField>
+
+    <ParamField path="cancelable" type="boolean" default="true" optional>
+      Whether the move can be prevented via `event.preventDefault()`.
+    </ParamField>
+
+    <ParamField path="propagate" type="boolean" default="true" optional>
+      Whether to dispatch `dragmove` events.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Note:** Only one of `by` or `to` should be provided.
+
+**Events dispatched:**
+- `dragmove` (preventable if `cancelable` is true)
+
+### stop()
+
+Stops the current drag operation.
+
+```typescript
+manager.actions.stop({
+  canceled: false,
+  event: mouseUpEvent
+});
+```
+
+<ParamField path="args" type="object" optional>
+  Configuration for stopping the operation.
+
+  <Expandable title="Arguments">
+    <ParamField path="event" type="Event" optional>
+      The native event that triggered the stop.
+    </ParamField>
+
+    <ParamField path="canceled" type="boolean" default="false" optional>
+      Whether the operation was canceled (as opposed to completed successfully).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Events dispatched:**
+- `dragend` - With `suspend()` method for async cleanup
+
+### setDragSource()
+
+Sets the source of the drag operation.
+
+```typescript
+manager.actions.setDragSource(draggable);
+// or
+manager.actions.setDragSource('draggable-id');
+```
+
+<ParamField path="source" type="T | UniqueIdentifier" required>
+  The draggable entity or its unique identifier.
+</ParamField>
+
+### setDropTarget()
+
+Sets the target of the drop operation.
+
+```typescript
+const prevented = await manager.actions.setDropTarget(droppableId);
+```
+
+<ParamField path="identifier" type="UniqueIdentifier | null | undefined" required>
+  The unique identifier of the droppable entity, or null/undefined to clear the target.
+</ParamField>
+
+<ResponseField name="return" type="Promise<boolean>">
+  A promise that resolves to true if the `dragover` event was prevented.
+</ResponseField>
+
+**Events dispatched:**
+- `dragover` (preventable) - If status is dragging
+
+## Usage Examples
+
+### Basic Setup
+
+```typescript
+import {DragDropManager, Draggable, Droppable} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager();
+
+// Create draggable
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    data: {label: 'Drag me'}
+  },
+  manager
+);
+
+// Create droppable
+const droppable = new Droppable(
+  {
+    id: 'zone-1',
+    collisionDetector: myCollisionDetector
+  },
+  manager
+);
+```
+
+### With Plugins and Sensors
+
+```typescript
+import {DragDropManager} from '@dnd-kit/abstract';
+import {PointerSensor} from '@dnd-kit/dom/sensors';
+import {SnapModifier} from '@dnd-kit/abstract/modifiers';
+
+const manager = new DragDropManager({
+  sensors: [PointerSensor],
+  modifiers: [SnapModifier.configure({gridSize: 20})],
+  plugins: (defaults) => [...defaults, MyCustomPlugin]
+});
+```
+
+### Event Handling
+
+```typescript
+const manager = new DragDropManager();
+
+// Prevent drag start conditionally
+manager.monitor.addEventListener('beforedragstart', (event) => {
+  if (!canDrag(event.operation.source)) {
+    event.preventDefault();
+  }
+});
+
+// Track drag progress
+manager.monitor.addEventListener('dragmove', (event) => {
+  console.log('Dragging to:', event.operation.position.current);
+});
+
+// Handle drop
+manager.monitor.addEventListener('dragend', (event) => {
+  if (!event.canceled && event.operation.target) {
+    const {source, target} = event.operation;
+    console.log(`Dropped ${source?.id} onto ${target?.id}`);
+  }
+});
+```
+
+### Manual Drag Control
+
+```typescript
+const manager = new DragDropManager();
+
+// Start drag programmatically
+const controller = manager.actions.start({
+  source: 'item-1',
+  coordinates: {x: 0, y: 0}
+});
+
+// Move the drag
+manager.actions.move({
+  to: {x: 100, y: 50}
+});
+
+// Cancel the drag
+controller.abort();
+// or
+manager.actions.stop({canceled: true});
+```
+
+### Cleanup
+
+```typescript
+const manager = new DragDropManager();
+
+// Use the manager...
+
+// Clean up when done
+manager.destroy();
+```
+
+## Type Inference
+
+You can infer draggable and droppable types from a manager:
+
+```typescript
+import type {InferDraggable, InferDroppable} from '@dnd-kit/abstract';
+
+type MyDraggable = InferDraggable<typeof manager>;
+type MyDroppable = InferDroppable<typeof manager>;
+```
+
+## See Also
+
+- [Draggable](/api/abstract/draggable) - Creating draggable entities
+- [Droppable](/api/abstract/droppable) - Creating droppable entities
+- [Sensors](/api/abstract/sensors) - Input handling
+- [Modifiers](/api/abstract/modifiers) - Behavior transformation
+- [Plugins](/api/abstract/plugins) - Extending functionality

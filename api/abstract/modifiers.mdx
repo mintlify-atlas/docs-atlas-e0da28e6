@@ -1,0 +1,613 @@
+---
+title: 'Modifiers'
+description: 'Transform drag behavior with constraints, snapping, and custom logic'
+---
+
+`Modifier` is the base class for transforming drag operation coordinates. Modifiers enable features like snapping to grids, restricting movement to specific boundaries, applying physics-based constraints, and implementing custom drag behaviors.
+
+## Modifier Class
+
+### Constructor
+
+Creates a new modifier instance.
+
+```typescript
+class MyModifier extends Modifier<T, U> {
+  constructor(manager: T, options?: U) {
+    super(manager, options);
+  }
+}
+```
+
+<ParamField path="manager" type="T extends DragDropManager" required>
+  The drag and drop manager that owns this modifier.
+</ParamField>
+
+<ParamField path="options" type="U extends ModifierOptions" optional>
+  Optional configuration for the modifier.
+</ParamField>
+
+<ParamField path="T" type="extends DragDropManager<any, any>" default="DragDropManager<any, any>">
+  Type parameter for the drag and drop manager.
+</ParamField>
+
+<ParamField path="U" type="extends ModifierOptions" default="ModifierOptions">
+  Type parameter for modifier options.
+</ParamField>
+
+## Properties
+
+### manager
+
+<ParamField path="manager" type="T" readonly>
+  The drag and drop manager instance that this modifier is bound to.
+
+  ```typescript
+  const manager = modifier.manager;
+  ```
+</ParamField>
+
+### options
+
+<ParamField path="options" type="U | undefined" readonly>
+  The configuration options for this modifier instance.
+
+  ```typescript
+  const options = modifier.options;
+  ```
+</ParamField>
+
+### disabled
+
+<ParamField path="disabled" type="boolean" reactive>
+  Whether the modifier instance is disabled.
+
+  ```typescript
+  modifier.disabled = true;
+  ```
+
+  Inherited from `Plugin`.
+</ParamField>
+
+## Methods
+
+### apply()
+
+Applies the modifier to the current drag operation.
+
+```typescript
+public apply(operation: DragOperationSnapshot): Coordinates;
+```
+
+<ParamField path="operation" type="DragOperationSnapshot<any, any>" required>
+  The current state of the drag operation.
+
+  <Expandable title="DragOperationSnapshot properties">
+    <ParamField path="source" type="Draggable | null" readonly>
+      The draggable being dragged.
+    </ParamField>
+
+    <ParamField path="target" type="Droppable | null" readonly>
+      The current drop target.
+    </ParamField>
+
+    <ParamField path="position" type="Position" readonly>
+      Current position with history (current, initial, previous).
+    </ParamField>
+
+    <ParamField path="transform" type="Coordinates" readonly>
+      Current transform coordinates before this modifier.
+    </ParamField>
+
+    <ParamField path="shape" type="WithHistory<Shape> | null" readonly>
+      Current shape with history.
+    </ParamField>
+
+    <ParamField path="activatorEvent" type="Event | null" readonly>
+      Event that initiated the drag.
+    </ParamField>
+
+    <ParamField path="status" type="Status" readonly>
+      Current operation status.
+    </ParamField>
+
+    <ParamField path="canceled" type="boolean" readonly>
+      Whether the operation was canceled.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="Coordinates">
+  The transformed coordinates.
+
+  ```typescript
+  {x: number, y: number}
+  ```
+</ResponseField>
+
+The default implementation returns the original transform unchanged. Override this method to implement custom transformation logic.
+
+### Inherited from Plugin
+
+### enable()
+
+Enables a disabled modifier instance.
+
+```typescript
+modifier.enable();
+```
+
+### disable()
+
+Disables an enabled modifier instance.
+
+```typescript
+modifier.disable();
+```
+
+### isDisabled()
+
+Checks if the modifier instance is disabled.
+
+```typescript
+const disabled = modifier.isDisabled();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if the modifier is disabled.
+</ResponseField>
+
+### configure()
+
+Configures a modifier instance with new options.
+
+```typescript
+modifier.configure({option: 'value'});
+```
+
+<ParamField path="options" type="U" optional>
+  The new options to apply.
+</ParamField>
+
+### destroy()
+
+Destroys a modifier instance and cleans up its resources.
+
+```typescript
+modifier.destroy();
+```
+
+## Static Methods
+
+### configure()
+
+Configures a modifier constructor with default options.
+
+```typescript
+const ConfiguredModifier = MyModifier.configure({
+  gridSize: 20,
+  boundary: 'window'
+});
+```
+
+<ParamField path="options" type="PluginOptions" required>
+  The options to configure the constructor with.
+</ParamField>
+
+<ResponseField name="return" type="ModifierDescriptor">
+  A configured modifier descriptor that can be passed to the manager or draggable.
+</ResponseField>
+
+## Types
+
+### ModifierOptions
+
+Base type for modifier options.
+
+```typescript
+type ModifierOptions = PluginOptions;
+type PluginOptions = Record<string, any>;
+```
+
+### ModifierConstructor
+
+Constructor type for creating modifier instances.
+
+```typescript
+type ModifierConstructor<T extends DragDropManager<any, any>> = 
+  PluginConstructor<T, Modifier<T, any>>;
+
+interface PluginConstructor<T, U> {
+  new (manager: T, options?: PluginOptions): U;
+}
+```
+
+### ModifierDescriptor
+
+Descriptor type for configuring modifiers.
+
+```typescript
+type ModifierDescriptor<T extends DragDropManager<any, any>> = 
+  PluginDescriptor<T, Modifier<T, any>, ModifierConstructor<T>>;
+
+type PluginDescriptor<T, U, V> = {
+  plugin: V;
+  options?: PluginOptions;
+};
+```
+
+### Modifiers
+
+Array type for multiple modifier configurations.
+
+```typescript
+type Modifiers<T extends DragDropManager<any, any>> = 
+  (ModifierConstructor<T> | ModifierDescriptor<T>)[];
+```
+
+## Implementing a Custom Modifier
+
+### Basic Implementation
+
+```typescript
+import {Modifier, type ModifierOptions} from '@dnd-kit/abstract';
+import type {DragOperationSnapshot, Coordinates} from '@dnd-kit/abstract';
+
+interface SnapModifierOptions extends ModifierOptions {
+  gridSize: number;
+}
+
+class SnapModifier extends Modifier<DragDropManager, SnapModifierOptions> {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const gridSize = this.options?.gridSize ?? 20;
+    
+    return {
+      x: Math.round(transform.x / gridSize) * gridSize,
+      y: Math.round(transform.y / gridSize) * gridSize
+    };
+  }
+}
+```
+
+### Advanced Implementation
+
+```typescript
+import {Modifier, type ModifierOptions} from '@dnd-kit/abstract';
+import type {Coordinates, Shape} from '@dnd-kit/geometry';
+
+interface RestrictModifierOptions extends ModifierOptions {
+  boundary: 'window' | 'parent' | Shape;
+}
+
+class RestrictModifier extends Modifier<DragDropManager, RestrictModifierOptions> {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform, shape} = operation;
+    const boundary = this.options?.boundary;
+    
+    if (!boundary || !shape) {
+      return transform;
+    }
+    
+    const bounds = this.getBounds(boundary);
+    const draggableRect = shape.current;
+    
+    // Calculate restricted position
+    let x = transform.x;
+    let y = transform.y;
+    
+    if (draggableRect.x + x < bounds.left) {
+      x = bounds.left - draggableRect.x;
+    }
+    if (draggableRect.x + x + draggableRect.width > bounds.right) {
+      x = bounds.right - draggableRect.x - draggableRect.width;
+    }
+    if (draggableRect.y + y < bounds.top) {
+      y = bounds.top - draggableRect.y;
+    }
+    if (draggableRect.y + y + draggableRect.height > bounds.bottom) {
+      y = bounds.bottom - draggableRect.y - draggableRect.height;
+    }
+    
+    return {x, y};
+  }
+  
+  private getBounds(boundary: RestrictModifierOptions['boundary']) {
+    if (boundary === 'window') {
+      return {
+        left: 0,
+        top: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight
+      };
+    }
+    // Handle other boundary types...
+  }
+}
+```
+
+### Chaining Modifiers
+
+Modifiers are applied in sequence, with each modifier receiving the output of the previous one:
+
+```typescript
+class LoggingModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    console.log('Before:', operation.transform);
+    
+    // Pass through unchanged
+    return operation.transform;
+  }
+}
+
+const manager = new DragDropManager({
+  modifiers: [
+    SnapModifier.configure({gridSize: 20}),
+    RestrictModifier.configure({boundary: 'window'}),
+    LoggingModifier
+  ]
+});
+// Execution order: Snap -> Restrict -> Logging
+```
+
+## Usage Examples
+
+### Using Modifiers with Manager
+
+```typescript
+import {DragDropManager} from '@dnd-kit/abstract';
+import {SnapModifier, RestrictModifier} from '@dnd-kit/abstract/modifiers';
+
+const manager = new DragDropManager({
+  modifiers: [
+    SnapModifier.configure({gridSize: 20}),
+    RestrictModifier.configure({boundary: 'window'})
+  ]
+});
+```
+
+### Per-Draggable Modifiers
+
+```typescript
+import {Draggable} from '@dnd-kit/abstract';
+import {SnapModifier} from '@dnd-kit/abstract/modifiers';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    modifiers: [
+      SnapModifier.configure({gridSize: 10})
+    ]
+  },
+  manager
+);
+// This draggable uses its own modifiers, overriding the manager's
+```
+
+### Dynamic Modifier Configuration
+
+```typescript
+const manager = new DragDropManager();
+
+// Add modifiers later
+manager.modifiers = [
+  SnapModifier.configure({gridSize: 20})
+];
+
+// Update modifiers
+manager.modifiers = [
+  SnapModifier.configure({gridSize: 40}),
+  RestrictModifier.configure({boundary: 'parent'})
+];
+```
+
+### Conditional Modification
+
+```typescript
+class ConditionalModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform, source} = operation;
+    
+    // Only apply to certain draggables
+    if (source?.data.snapToGrid) {
+      const gridSize = 20;
+      return {
+        x: Math.round(transform.x / gridSize) * gridSize,
+        y: Math.round(transform.y / gridSize) * gridSize
+      };
+    }
+    
+    return transform;
+  }
+}
+```
+
+### Accessing Operation State
+
+```typescript
+class SmartModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {
+      transform,
+      source,
+      target,
+      position,
+      shape,
+      activatorEvent
+    } = operation;
+    
+    // Use source data
+    if (source?.data.restricted) {
+      // Apply restrictions
+    }
+    
+    // Check if over a target
+    if (target) {
+      // Snap to target center
+      const targetShape = target.shape;
+      if (targetShape && shape) {
+        return {
+          x: targetShape.center.x - shape.initial.center.x,
+          y: targetShape.center.y - shape.initial.center.y
+        };
+      }
+    }
+    
+    // Check movement delta
+    const delta = position.delta;
+    if (Math.abs(delta.x) < 5 && Math.abs(delta.y) < 5) {
+      // Minimal movement, return to origin
+      return {x: 0, y: 0};
+    }
+    
+    return transform;
+  }
+}
+```
+
+### Disable/Enable Modifiers
+
+```typescript
+const snapModifier = new SnapModifier(manager, {gridSize: 20});
+
+// Temporarily disable
+snapModifier.disable();
+
+// Re-enable
+snapModifier.enable();
+
+// Check status
+if (snapModifier.isDisabled()) {
+  console.log('Snapping is disabled');
+}
+```
+
+## Common Modifier Patterns
+
+### Grid Snapping
+
+```typescript
+class GridSnapModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const gridSize = this.options?.gridSize ?? 20;
+    
+    return {
+      x: Math.round(transform.x / gridSize) * gridSize,
+      y: Math.round(transform.y / gridSize) * gridSize
+    };
+  }
+}
+```
+
+### Restrict to Container
+
+```typescript
+class RestrictToContainerModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform, shape} = operation;
+    if (!shape) return transform;
+    
+    const container = this.options?.container;
+    if (!container) return transform;
+    
+    const bounds = container.getBoundingClientRect();
+    const rect = shape.current;
+    
+    return {
+      x: Math.max(
+        bounds.left - rect.x,
+        Math.min(transform.x, bounds.right - rect.x - rect.width)
+      ),
+      y: Math.max(
+        bounds.top - rect.y,
+        Math.min(transform.y, bounds.bottom - rect.y - rect.height)
+      )
+    };
+  }
+}
+```
+
+### Axis Lock
+
+```typescript
+class AxisLockModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const axis = this.options?.axis; // 'x' | 'y'
+    
+    if (axis === 'x') {
+      return {x: transform.x, y: 0};
+    }
+    if (axis === 'y') {
+      return {x: 0, y: transform.y};
+    }
+    
+    return transform;
+  }
+}
+```
+
+### Resistance
+
+```typescript
+class ResistanceModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const factor = this.options?.factor ?? 0.5;
+    
+    return {
+      x: transform.x * factor,
+      y: transform.y * factor
+    };
+  }
+}
+```
+
+### Snap to Elements
+
+```typescript
+class SnapToElementsModifier extends Modifier {
+  public apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform, shape} = operation;
+    if (!shape) return transform;
+    
+    const snapTargets = this.options?.targets ?? [];
+    const threshold = this.options?.threshold ?? 20;
+    
+    const currentCenter = {
+      x: shape.initial.center.x + transform.x,
+      y: shape.initial.center.y + transform.y
+    };
+    
+    for (const target of snapTargets) {
+      const targetRect = target.getBoundingClientRect();
+      const targetCenter = {
+        x: targetRect.left + targetRect.width / 2,
+        y: targetRect.top + targetRect.height / 2
+      };
+      
+      const distance = Math.hypot(
+        currentCenter.x - targetCenter.x,
+        currentCenter.y - targetCenter.y
+      );
+      
+      if (distance < threshold) {
+        return {
+          x: targetCenter.x - shape.initial.center.x,
+          y: targetCenter.y - shape.initial.center.y
+        };
+      }
+    }
+    
+    return transform;
+  }
+}
+```
+
+## See Also
+
+- [DragDropManager](/api/abstract/drag-drop-manager) - Using modifiers with the manager
+- [Draggable](/api/abstract/draggable) - Attaching modifiers to draggables
+- [Sensors](/api/abstract/sensors) - Detecting drag interactions
+- [Plugins](/api/abstract/plugins) - Base plugin architecture

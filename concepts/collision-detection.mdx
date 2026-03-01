@@ -1,0 +1,478 @@
+---
+title: Collision detection
+description: Learn how dnd-kit detects collisions between draggables and droppables using a priority-based system
+---
+
+Collision detection determines when a dragged item is over a droppable target. dnd-kit uses a flexible, priority-based collision system that supports multiple detection algorithms.
+
+## Overview
+
+The collision detection system:
+
+- Runs during drag operations to detect overlaps
+- Supports multiple collision algorithms
+- Uses priority-based resolution for overlapping collisions
+- Allows per-droppable collision configuration
+- Provides collision data for custom behaviors
+
+## Collision observer
+
+The `CollisionObserver` manages collision detection:
+
+```typescript
+class CollisionObserver<T extends Draggable, U extends Droppable> {
+  // Get current collisions
+  get collisions(): Collisions;
+  
+  // Compute collisions
+  computeCollisions(
+    entries?: Droppable[],
+    collisionDetector?: CollisionDetector
+  ): Collisions;
+  
+  // Force update
+  forceUpdate(immediate?: boolean): void;
+}
+```
+
+The observer automatically recomputes collisions when:
+
+- The drag position changes
+- Droppable shapes change (resize, scroll, etc.)
+- Droppables are added or removed
+
+## Collision types
+
+```typescript
+enum CollisionType {
+  Collision,            // Basic collision
+  ShapeIntersection,    // Shape-based intersection
+  PointerIntersection,  // Pointer-based intersection
+}
+
+interface Collision {
+  id: UniqueIdentifier;           // Droppable ID
+  priority: CollisionPriority | number;
+  type: CollisionType;
+  value: number;                  // Collision strength (0-1 or distance)
+  data?: Record<string, any>;     // Additional data
+}
+```
+
+## Collision detectors
+
+Collision detectors are functions that determine if a collision occurred:
+
+```typescript
+type CollisionDetector = <
+  T extends Draggable = Draggable,
+  U extends Droppable = Droppable
+>(
+  input: CollisionDetectorInput<T, U>
+) => Collision | null;
+
+interface CollisionDetectorInput<T, U> {
+  droppable: U;                   // The droppable to check
+  dragOperation: DragOperation<T, U>;  // Current drag state
+}
+```
+
+### Built-in detectors
+
+dnd-kit provides several collision detection algorithms:
+
+**Pointer intersection:**
+
+```typescript
+import {pointerIntersection} from '@dnd-kit/dom';
+
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: pointerIntersection,
+});
+```
+
+Detects when the pointer is over the droppable. Best for precise targeting.
+
+**Shape intersection:**
+
+```typescript
+import {shapeIntersection} from '@dnd-kit/dom';
+
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: shapeIntersection,
+});
+```
+
+Detects when the draggable's bounding rectangle overlaps the droppable. Returns the overlap area as the collision value.
+
+**Center of mass:**
+
+```typescript
+import {centerOfMass} from '@dnd-kit/dom';
+
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: centerOfMass,
+});
+```
+
+Detects when the center point of the draggable is over the droppable. Useful for card-like interfaces.
+
+**Closest corners:**
+
+```typescript
+import {closestCorners} from '@dnd-kit/dom';
+
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: closestCorners,
+});
+```
+
+Computes the distance between the draggable's corners and the droppable's corners. Returns the minimum distance as the collision value.
+
+## Collision priority
+
+When multiple droppables collide, priority determines the winner:
+
+```typescript
+enum CollisionPriority {
+  Lowest = 0,
+  Low = 1,
+  Normal = 2,     // Default
+  High = 3,
+  Highest = 4,
+}
+```
+
+Set priority per droppable:
+
+```typescript
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: pointerIntersection,
+  collisionPriority: CollisionPriority.High,
+});
+```
+
+Or use custom numeric priorities:
+
+```typescript
+const droppable = new Droppable({
+  id: 'nested-container',
+  element: nestedElement,
+  collisionDetector: pointerIntersection,
+  collisionPriority: 100,  // Higher than standard priorities
+});
+```
+
+### Priority resolution
+
+Collisions are sorted by:
+
+1. **Priority** (descending): Higher priority wins
+2. **Value** (descending): Higher value wins if priorities are equal
+3. **Order**: First in the list wins if both are equal
+
+```typescript
+// From collision/utilities.ts
+function sortCollisions(a: Collision, b: Collision): number {
+  // Sort by priority (higher first)
+  if (a.priority !== b.priority) {
+    return b.priority - a.priority;
+  }
+  
+  // Then by value (higher first)
+  return b.value - a.value;
+}
+```
+
+## Computing collisions
+
+The `CollisionObserver` computes collisions automatically, but you can also compute them manually:
+
+```typescript
+const {collisionObserver} = manager;
+
+// Get current collisions
+const collisions = collisionObserver.collisions;
+
+// Compute with specific droppables
+const specificCollisions = collisionObserver.computeCollisions([
+  droppable1,
+  droppable2,
+]);
+
+// Compute with custom detector
+const customCollisions = collisionObserver.computeCollisions(
+  undefined,  // All droppables
+  myCustomDetector
+);
+```
+
+### Implementation details
+
+```typescript
+// From collision/observer.ts
+computeCollisions(
+  entries?: Droppable[],
+  collisionDetector?: CollisionDetector
+) {
+  const {registry, dragOperation} = this.manager;
+  const {source, shape, status} = dragOperation;
+
+  if (!status.initialized || !shape) {
+    return [];
+  }
+
+  const collisions: Collision[] = [];
+
+  for (const entry of entries ?? registry.droppables) {
+    // Skip disabled droppables
+    if (entry.disabled) continue;
+    
+    // Check acceptance rules
+    if (source && !entry.accepts(source)) continue;
+    
+    const detectCollision = collisionDetector ?? entry.collisionDetector;
+    if (!detectCollision) continue;
+    
+    // Detect collision
+    const collision = detectCollision({
+      droppable: entry,
+      dragOperation,
+    });
+    
+    if (collision) {
+      // Override priority if droppable specifies one
+      if (entry.collisionPriority != null) {
+        collision.priority = entry.collisionPriority;
+      }
+      
+      collisions.push(collision);
+    }
+  }
+
+  // Sort by priority and value
+  collisions.sort(sortCollisions);
+  
+  return collisions;
+}
+```
+
+## Custom collision detectors
+
+You can create custom collision detection algorithms:
+
+```typescript
+import {CollisionDetector, CollisionPriority, CollisionType} from '@dnd-kit/abstract';
+
+const customDetector: CollisionDetector = ({droppable, dragOperation}) => {
+  const {shape} = dragOperation;
+  const droppableShape = droppable.shape;
+  
+  if (!shape || !droppableShape) {
+    return null;
+  }
+  
+  // Custom logic here
+  const isColliding = /* your calculation */;
+  
+  if (!isColliding) {
+    return null;
+  }
+  
+  return {
+    id: droppable.id,
+    priority: CollisionPriority.Normal,
+    type: CollisionType.Collision,
+    value: /* collision strength 0-1 */,
+    data: {
+      // Custom data
+      customInfo: 'value',
+    },
+  };
+};
+```
+
+### Distance-based detector example
+
+```typescript
+import {distance} from '@dnd-kit/geometry';
+
+const distanceDetector: CollisionDetector = ({droppable, dragOperation}) => {
+  const {shape} = dragOperation;
+  const droppableShape = droppable.shape;
+  
+  if (!shape || !droppableShape) return null;
+  
+  // Calculate distance between centers
+  const dragCenter = {x: shape.center.x, y: shape.center.y};
+  const dropCenter = {x: droppableShape.center.x, y: droppableShape.center.y};
+  
+  const dist = distance(dragCenter, dropCenter);
+  const threshold = 100;
+  
+  if (dist > threshold) return null;
+  
+  // Closer = higher value
+  const value = 1 - (dist / threshold);
+  
+  return {
+    id: droppable.id,
+    priority: CollisionPriority.Normal,
+    type: CollisionType.Collision,
+    value,
+    data: {distance: dist},
+  };
+};
+```
+
+## Collision notifier
+
+The `CollisionNotifier` is a core plugin that updates the drag target:
+
+```typescript
+// From collision/notifier.ts
+class CollisionNotifier extends CorePlugin {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      const collisions = this.manager.collisionObserver.collisions;
+      const collision = collisions[0];  // Highest priority
+      
+      // Update drag operation target
+      this.manager.dragOperation.targetIdentifier = 
+        collision?.id ?? null;
+    });
+  }
+}
+```
+
+This plugin is automatically included in the abstract manager and updates `dragOperation.target` based on the highest-priority collision.
+
+## Using collision data
+
+Access collision information during drag operations:
+
+```typescript
+manager.monitor.addEventListener('dragmove', (event) => {
+  const {collisionObserver} = manager;
+  const collisions = collisionObserver.collisions;
+  
+  for (const collision of collisions) {
+    console.log(`Collision with ${collision.id}:`);
+    console.log(`  Priority: ${collision.priority}`);
+    console.log(`  Type: ${collision.type}`);
+    console.log(`  Value: ${collision.value}`);
+    console.log(`  Data:`, collision.data);
+  }
+  
+  // Highest priority collision (the target)
+  const target = event.operation.target;
+  if (target) {
+    console.log('Current target:', target.id);
+  }
+});
+```
+
+## Acceptance rules
+
+Droppables can filter which draggables they accept:
+
+```typescript
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: pointerIntersection,
+  
+  // Only accept 'card' type
+  accept: 'card',
+});
+```
+
+The collision observer respects acceptance rules:
+
+```typescript
+// From observer.ts
+for (const entry of registry.droppables) {
+  // Skip if doesn't accept the draggable
+  if (source && !entry.accepts(source)) {
+    continue;
+  }
+  
+  // ... detect collision
+}
+```
+
+See [Draggables and Droppables](/concepts/draggables-droppables#acceptance-rules) for more on acceptance rules.
+
+## Force updates
+
+You can force collision recomputation:
+
+```typescript
+const {collisionObserver} = manager;
+
+// Recompute immediately
+collisionObserver.forceUpdate(true);
+
+// Reset cache, recompute on next access
+collisionObserver.forceUpdate(false);
+```
+
+This is useful when:
+
+- Droppable positions change externally
+- You add/remove droppables programmatically
+- You need to trigger a manual update
+
+## Performance considerations
+
+<Tip>
+**Collision detection runs frequently**: The observer recomputes collisions on every position change during a drag. Keep collision detectors lightweight.
+</Tip>
+
+<Info>
+**Caching**: The observer caches collision results and only recomputes when position changes. Accessing the same position multiple times uses the cache.
+</Info>
+
+<Warning>
+**Avoid heavy computations**: Don't perform expensive calculations in collision detectors. Use simple geometric tests when possible.
+</Warning>
+
+## Choosing a detector
+
+Use this guide to choose the right detector:
+
+| Detector | Best for | Behavior |
+|----------|----------|----------|
+| `pointerIntersection` | Precise targeting, nested containers | Pointer over droppable |
+| `shapeIntersection` | Cards, tiles, general drag-drop | Bounding rectangles overlap |
+| `centerOfMass` | Sortable lists, grid layouts | Center point over droppable |
+| `closestCorners` | Proximity-based, snap-to-grid | Closest corner distance |
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Droppables" icon="box" href="/concepts/draggables-droppables#droppable">
+    Droppable configuration
+  </Card>
+  <Card title="Custom detectors" icon="wand-magic-sparkles" href="/examples/custom-collision-detection">
+    Build custom algorithms
+  </Card>
+  <Card title="Collision algorithms" icon="eye" href="/api/collision/algorithms">
+    API reference
+  </Card>
+  <Card title="Geometry utilities" icon="ruler" href="/api/geometry/utilities">
+    Spatial calculations
+  </Card>
+</CardGroup>

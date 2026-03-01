@@ -1,0 +1,237 @@
+---
+title: 'Basic Sortable List'
+description: 'Create a simple drag-and-drop sortable list with dnd-kit'
+---
+
+## Overview
+
+The basic sortable list is the fundamental building block for implementing drag-and-drop sorting in dnd-kit. This example demonstrates how to create a vertical list where items can be reordered by dragging.
+
+## Quick Start
+
+Here's the simplest possible sortable list implementation:
+
+```tsx
+import {useSortable} from '@dnd-kit/react/sortable';
+import {DragDropProvider} from '@dnd-kit/react';
+import {move} from '@dnd-kit/helpers';
+import {useState} from 'react';
+
+function SortableItem({id, index}: {id: number; index: number}) {
+  const {ref} = useSortable({id, index});
+
+  return <li ref={ref}>Item {id}</li>;
+}
+
+function App() {
+  const [items, setItems] = useState([1, 2, 3, 4]);
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        setItems((items) => move(items, event));
+      }}
+    >
+      <ul>
+        {items.map((id, index) => (
+          <SortableItem key={id} id={id} index={index} />
+        ))}
+      </ul>
+    </DragDropProvider>
+  );
+}
+```
+
+## Full Implementation
+
+For a production-ready sortable list with drag handles and visual feedback:
+
+```tsx
+import React, {useRef, useState} from 'react';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+
+function SortableItem({id, index}: {id: number; index: number}) {
+  const [element, setElement] = useState<Element | null>(null);
+  const handleRef = useRef<HTMLButtonElement | null>(null);
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    handle: handleRef,
+  });
+
+  return (
+    <li
+      ref={setElement}
+      className="item"
+      data-shadow={isDragging || undefined}
+      style={{
+        padding: '16px',
+        margin: '8px 0',
+        backgroundColor: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <span>Item {id}</span>
+      <button
+        ref={handleRef}
+        className="handle"
+        style={{
+          cursor: 'grab',
+          padding: '8px',
+          border: 'none',
+          background: 'transparent',
+        }}
+      >
+        ⋮⋮
+      </button>
+    </li>
+  );
+}
+
+export default function App() {
+  const [items, setItems] = useState(() =>
+    Array.from({length: 100}, (_, i) => i + 1)
+  );
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        setItems((items) => move(items, event));
+      }}
+    >
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: '20px',
+          maxWidth: '600px',
+          margin: '0 auto',
+        }}
+      >
+        {items.map((id, index) => (
+          <SortableItem key={id} id={id} index={index} />
+        ))}
+      </ul>
+    </DragDropProvider>
+  );
+}
+```
+
+## Key Concepts
+
+### The `useSortable` Hook
+
+The `useSortable` hook is the core of sortable functionality. It accepts the following key props:
+
+- **`id`**: A unique identifier for the sortable item
+- **`index`**: The current position of the item in the list
+- **`element`**: A ref to the DOM element (optional, can use the returned `ref` instead)
+- **`handle`**: A ref to the drag handle element (optional, if not provided, the entire element is draggable)
+
+The hook returns:
+
+- **`ref`**: Callback ref to attach to your sortable element
+- **`handleRef`**: Callback ref to attach to your drag handle
+- **`isDragging`**: Boolean indicating if this item is currently being dragged
+- **`isDropTarget`**: Boolean indicating if this item is a valid drop target
+
+### State Management with `move`
+
+The `move` helper function from `@dnd-kit/helpers` automatically handles the reordering logic:
+
+```tsx
+onDragEnd={(event) => {
+  setItems((items) => move(items, event));
+}}
+```
+
+This function:
+- Extracts the source and target indices from the drag event
+- Reorders the array accordingly
+- Handles edge cases automatically
+
+### Element References
+
+You can attach the sortable behavior to your elements in two ways:
+
+**Using the returned ref (simpler):**
+```tsx
+const {ref} = useSortable({id, index});
+return <div ref={ref}>...</div>;
+```
+
+**Using state (more control):**
+```tsx
+const [element, setElement] = useState<Element | null>(null);
+const {} = useSortable({id, index, element});
+return <div ref={setElement}>...</div>;
+```
+
+## Drag Handles
+
+Drag handles allow users to drag items only by grabbing a specific part of the item:
+
+```tsx
+function SortableItem({id, index}) {
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const {ref, isDragging} = useSortable({
+    id,
+    index,
+    handle: handleRef, // Only this element triggers dragging
+  });
+
+  return (
+    <div ref={ref}>
+      <span>Content that cannot be dragged</span>
+      <button ref={handleRef}>⋮⋮ Drag here</button>
+    </div>
+  );
+}
+```
+
+Without a handle, the entire element is draggable. This is useful for simple lists but can interfere with other interactions like text selection or button clicks.
+
+## Styling During Drag
+
+Use the `isDragging` boolean to style items during drag operations:
+
+```tsx
+const {ref, isDragging} = useSortable({id, index});
+
+return (
+  <div
+    ref={ref}
+    style={{
+      opacity: isDragging ? 0.5 : 1,
+      transform: isDragging ? 'scale(1.05)' : 'scale(1)',
+      transition: 'all 200ms',
+    }}
+  >
+    {/* ... */}
+  </div>
+);
+```
+
+## Performance Tips
+
+1. **Use stable keys**: Always use unique, stable IDs as keys, not array indices
+2. **Memoize items**: Use `React.memo` for individual sortable items to prevent unnecessary re-renders
+3. **Optimize large lists**: For lists with hundreds of items, consider virtualization (see the virtualized lists example)
+
+```tsx
+const SortableItem = React.memo(function SortableItem({id, index}) {
+  // ... implementation
+});
+```
+
+## Next Steps
+
+- Learn about [sortable grids](/examples/sortable-grid) for 2D layouts
+- Explore [multiple lists](/examples/multiple-lists) for kanban-style boards
+- Implement [virtualized lists](/examples/virtualized-lists) for better performance with large datasets

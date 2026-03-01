@@ -1,0 +1,508 @@
+---
+title: 'Multiple Sortable Lists'
+description: 'Create kanban boards and multi-container drag-and-drop interfaces'
+---
+
+## Overview
+
+Multiple sortable lists enable drag-and-drop between different containers, perfect for kanban boards, file organizers, and categorized item management. Items can be reordered within lists or moved between them.
+
+## Basic Multiple Lists
+
+```tsx
+import React, {memo, useRef, useState, useCallback} from 'react';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+import {CollisionPriority} from '@dnd-kit/abstract';
+
+interface Items {
+  [key: string]: string[];
+}
+
+const SortableItem = memo(function SortableItem({
+  id,
+  column,
+  index,
+}: {
+  id: string;
+  column: string;
+  index: number;
+}) {
+  const [element, setElement] = useState<Element | null>(null);
+  const handleRef = useRef<HTMLButtonElement | null>(null);
+  
+  const {isDragging} = useSortable({
+    id,
+    group: column, // Group items by column
+    accept: 'item', // Accept items with type 'item'
+    type: 'item',   // This is an item type
+    index,
+    element,
+    handle: handleRef,
+    data: {group: column}, // Store which column this belongs to
+  });
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        padding: '12px',
+        margin: '8px 0',
+        backgroundColor: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        borderRadius: '6px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      {id}
+      <button
+        ref={handleRef}
+        style={{
+          cursor: 'grab',
+          border: 'none',
+          background: 'transparent',
+          fontSize: '18px',
+        }}
+      >
+        ⋮⋮
+      </button>
+    </div>
+  );
+});
+
+const SortableColumn = memo(function SortableColumn({
+  id,
+  rows,
+  index,
+}: {
+  id: string;
+  rows: string[];
+  index: number;
+}) {
+  const [element, setElement] = useState<Element | null>(null);
+  const handleRef = useRef<HTMLButtonElement | null>(null);
+  
+  const {isDragging} = useSortable({
+    id,
+    accept: ['column', 'item'], // Columns can accept both columns and items
+    collisionPriority: CollisionPriority.Low, // Lower priority for collision detection
+    type: 'column',
+    index,
+    element,
+    handle: handleRef,
+  });
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        padding: '16px',
+        backgroundColor: isDragging ? '#fafafa' : '#f8f9fa',
+        border: '2px solid #dee2e6',
+        borderRadius: '8px',
+        minWidth: '300px',
+        minHeight: '400px',
+      }}
+    >
+      <h2 style={{margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8}}>
+        {id}
+        <button
+          ref={handleRef}
+          style={{
+            cursor: 'grab',
+            border: 'none',
+            background: 'transparent',
+            fontSize: '16px',
+          }}
+        >
+          ⋮⋮
+        </button>
+      </h2>
+      <div>
+        {rows.map((itemId, itemIndex) => (
+          <SortableItem
+            key={itemId}
+            id={itemId}
+            column={id}
+            index={itemIndex}
+          />
+        ))}
+      </div>
+    </div>
+  );
+});
+
+export default function MultipleListsApp() {
+  const [items, setItems] = useState<Items>({
+    A: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'],
+    B: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'],
+    C: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'],
+    D: [],
+  });
+  const columns = Object.keys(items);
+  const snapshot = useRef(structuredClone(items));
+
+  return (
+    <DragDropProvider
+      onDragStart={useCallback(() => {
+        snapshot.current = structuredClone(items);
+      }, [items])}
+      onDragOver={useCallback((event) => {
+        const {source} = event.operation;
+
+        // Don't update state for column dragging (use optimistic sorting)
+        if (source && source.type === 'column') {
+          return;
+        }
+
+        setItems((items) => move(items, event));
+      }, [])}
+      onDragEnd={useCallback((event) => {
+        if (event.canceled) {
+          setItems(snapshot.current);
+          return;
+        }
+      }, [])}
+    >
+      <div style={{display: 'flex', gap: 20, padding: 20, overflow: 'auto'}}>
+        {columns.map((column, columnIndex) => (
+          <SortableColumn
+            key={column}
+            id={column}
+            index={columnIndex}
+            rows={items[column]}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Key Concepts
+
+### Groups
+
+The `group` prop associates items with their container:
+
+```tsx
+useSortable({
+  id: 'item-1',
+  group: 'column-A', // This item belongs to column A
+  index: 0,
+});
+```
+
+When dragging between lists, dnd-kit uses groups to track where items came from and where they're going.
+
+### Accept Types
+
+The `accept` prop defines what types of draggables a sortable can receive:
+
+```tsx
+useSortable({
+  id: 'column-A',
+  accept: ['item'], // This column only accepts items
+  type: 'column',   // This is a column
+});
+```
+
+This creates a type system for your drag-and-drop interactions:
+- Items can only be dropped into containers that accept their type
+- Columns that accept `['column', 'item']` can receive both
+
+### Collision Priority
+
+When items overlap, `collisionPriority` determines which should be considered:
+
+```tsx
+import {CollisionPriority} from '@dnd-kit/abstract';
+
+useSortable({
+  id: 'column',
+  collisionPriority: CollisionPriority.Low, // Prefer items over columns
+});
+```
+
+This ensures that when dragging over nested sortables (like items within columns), the correct target is selected.
+
+## Event Handling
+
+### onDragOver vs onDragEnd
+
+```tsx
+<DragDropProvider
+  onDragOver={(event) => {
+    // Update state in real-time as user drags
+    setItems((items) => move(items, event));
+  }}
+  onDragEnd={(event) => {
+    // Final update after drag completes
+    setItems((items) => move(items, event));
+  }}
+>
+```
+
+**Use `onDragOver` for:**
+- Real-time visual feedback
+- Immediate state updates (optimistic UI)
+
+**Use `onDragEnd` for:**
+- Persisting changes to backend
+- Non-optimistic updates (wait until drag completes)
+
+### Cancellation Handling
+
+Always handle canceled drags to restore state:
+
+```tsx
+const snapshot = useRef(structuredClone(items));
+
+<DragDropProvider
+  onDragStart={() => {
+    snapshot.current = structuredClone(items);
+  }}
+  onDragEnd={(event) => {
+    if (event.canceled) {
+      setItems(snapshot.current); // Restore original state
+      return;
+    }
+    // Process successful drop
+  }}
+>
+```
+
+## Advanced Patterns
+
+### Styled Columns with Colors
+
+```tsx
+const COLORS: Record<string, string> = {
+  A: '#7193f1',
+  B: '#FF851B',
+  C: '#2ECC40',
+  D: '#ff3680',
+};
+
+function SortableItem({id, column, index}) {
+  const {ref, isDragging} = useSortable({
+    id,
+    group: column,
+    type: 'item',
+    accept: 'item',
+    index,
+    data: {group: column},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        borderLeft: `4px solid ${COLORS[column]}`,
+        backgroundColor: isDragging ? '#f9f9f9' : 'white',
+        // ... other styles
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+### Adding Items to Lists
+
+```tsx
+function SortableColumn({id, rows, index}) {
+  const [items, setItems] = useContext(ItemsContext);
+  
+  const handleAddItem = () => {
+    const newId = `${id}${rows.length + 1}`;
+    setItems({
+      ...items,
+      [id]: [...items[id], newId],
+    });
+  };
+
+  return (
+    <div ref={ref}>
+      <h2>{id}</h2>
+      <button onClick={handleAddItem}>+ Add Item</button>
+      {rows.map((itemId, index) => (
+        <SortableItem key={itemId} id={itemId} column={id} index={index} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Removing Items
+
+```tsx
+function SortableItem({id, column, index, onRemove}) {
+  const {ref, handleRef, isDragging} = useSortable({
+    id,
+    group: column,
+    type: 'item',
+    index,
+  });
+
+  return (
+    <div ref={ref}>
+      {id}
+      <button ref={handleRef}>⋮⋮</button>
+      {!isDragging && (
+        <button onClick={() => onRemove(id, column)}>×</button>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [items, setItems] = useState({...});
+
+  const handleRemove = useCallback((id: string, column: string) => {
+    setItems((items) => ({
+      ...items,
+      [column]: items[column].filter(item => item !== id),
+    }));
+  }, []);
+
+  // ... render with onRemove prop
+}
+```
+
+### Nested Sortables
+
+Columns themselves can be sortable:
+
+```tsx
+const {ref, handleRef} = useSortable({
+  id: columnId,
+  type: 'column',
+  accept: ['column', 'item'],
+  index: columnIndex,
+});
+```
+
+This allows users to reorder both columns and items within columns.
+
+## Sensors Configuration
+
+Customize how drag operations are triggered:
+
+```tsx
+import {PointerSensor, KeyboardSensor} from '@dnd-kit/dom';
+
+const sensors = [
+  PointerSensor.configure({
+    activatorElements(source) {
+      return [source.element, source.handle];
+    },
+  }),
+  KeyboardSensor,
+];
+
+<DragDropProvider sensors={sensors}>
+  {/* ... */}
+</DragDropProvider>
+```
+
+This configuration:
+- Enables both mouse/touch and keyboard navigation
+- Allows activation via the element or its handle
+
+## Feedback Configuration
+
+Control visual feedback during dragging:
+
+```tsx
+import {Feedback} from '@dnd-kit/dom';
+
+useSortable({
+  id,
+  index,
+  plugins: [Feedback.configure({feedback: 'clone'})],
+});
+```
+
+Options:
+- `'clone'`: Shows a clone of the item while dragging
+- `'move'`: Moves the original item
+
+## Real-World Example: Kanban Board
+
+```tsx
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface Board {
+  [column: string]: Task[];
+}
+
+function KanbanBoard() {
+  const [board, setBoard] = useState<Board>({
+    'To Do': [
+      {id: 't1', title: 'Design mockups', description: '...'},
+      {id: 't2', title: 'Review PRs', description: '...'},
+    ],
+    'In Progress': [
+      {id: 't3', title: 'Implement feature', description: '...'},
+    ],
+    'Done': [
+      {id: 't4', title: 'Fix bug #123', description: '...'},
+    ],
+  });
+
+  const handleDragEnd = async (event) => {
+    if (event.canceled) return;
+    
+    const newBoard = move(board, event);
+    setBoard(newBoard);
+    
+    // Persist to backend
+    await saveBoardState(newBoard);
+  };
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div style={{display: 'flex', gap: 20}}>
+        {Object.keys(board).map((columnId, index) => (
+          <Column
+            key={columnId}
+            id={columnId}
+            tasks={board[columnId]}
+            index={index}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Performance Optimization
+
+1. **Memoize components**: Use `React.memo` to prevent unnecessary re-renders
+2. **Snapshot state**: Keep a snapshot for quick rollback on cancel
+3. **Debounce backend saves**: Don't save on every `onDragOver`
+
+```tsx
+const SortableItem = memo(function SortableItem({id, column, index}) {
+  // Component implementation
+});
+
+const SortableColumn = memo(function SortableColumn({id, rows, index}) {
+  // Component implementation
+});
+```
+
+## Next Steps
+
+- Learn about [virtualized lists](/examples/virtualized-lists) for handling large kanban boards
+- Explore [collision detection strategies](/api/collision/algorithms) for fine-tuning drop behavior

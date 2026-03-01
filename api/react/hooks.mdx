@@ -1,0 +1,446 @@
+---
+title: 'Additional Hooks'
+description: 'Utility hooks for accessing drag and drop state and manager instances'
+---
+
+The React adapter provides additional hooks for accessing the drag and drop manager, monitoring events, and tracking drag operations.
+
+## useDragDropManager
+
+Access the `DragDropManager` instance from anywhere within a `DragDropProvider`.
+
+### Usage
+
+```tsx
+import {useDragDropManager} from '@dnd-kit/react';
+
+function MyComponent() {
+  const manager = useDragDropManager();
+
+  return (
+    <button onClick={() => manager?.dragOperation.cancel()}>
+      Cancel Drag
+    </button>
+  );
+}
+```
+
+### Return Value
+
+<ResponseField name="manager" type="DragDropManager | null">
+  The `DragDropManager` instance, or `null` if called outside a `DragDropProvider`.
+
+  The manager provides access to:
+  - `dragOperation` — Current drag operation state
+  - `registry` — Registry of draggables and droppables
+  - `monitor` — Event monitor for subscribing to events
+  - `plugins` — Active plugins
+  - `sensors` — Active sensors
+  - `modifiers` — Active modifiers
+</ResponseField>
+
+### Example
+
+```tsx
+function DragControls() {
+  const manager = useDragDropManager();
+
+  const cancelDrag = () => {
+    manager?.dragOperation.cancel();
+  };
+
+  const isDragging = manager?.dragOperation.status.dragging ?? false;
+
+  return (
+    <div>
+      <p>Status: {isDragging ? 'Dragging' : 'Idle'}</p>
+      {isDragging && (
+        <button onClick={cancelDrag}>Cancel</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Type Parameters
+
+```tsx
+interface MyData {
+  label: string;
+}
+
+const manager = useDragDropManager<MyData>();
+// manager.dragOperation.source.data is typed as MyData
+```
+
+---
+
+## useDragDropMonitor
+
+Monitor drag and drop events from anywhere within a `DragDropProvider`. This hook subscribes to events and automatically cleans up listeners when the component unmounts.
+
+### Usage
+
+```tsx
+import {useDragDropMonitor} from '@dnd-kit/react';
+
+function EventLogger() {
+  useDragDropMonitor({
+    onDragStart: (event, manager) => {
+      console.log('Drag started:', event.operation.source.id);
+    },
+    onDragEnd: (event, manager) => {
+      console.log('Drag ended:', event.operation.source.id);
+    },
+  });
+
+  return <div>Check console for drag events</div>;
+}
+```
+
+### Parameters
+
+<ParamField path="handlers" type="Partial<EventHandlers>" required>
+  Object containing event handlers for drag and drop events. All handlers are optional.
+
+  Available handlers:
+  - `onBeforeDragStart`
+  - `onDragStart`
+  - `onDragMove`
+  - `onDragOver`
+  - `onDragEnd`
+  - `onCollision`
+</ParamField>
+
+### Event Handlers
+
+<ParamField path="onBeforeDragStart" type="(event: BeforeDragStartEvent, manager: DragDropManager) => void">
+  Called before a drag operation starts.
+
+  ```tsx
+  useDragDropMonitor({
+    onBeforeDragStart: (event) => {
+      console.log('About to drag:', event.source.id);
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="onDragStart" type="(event: DragStartEvent, manager: DragDropManager) => void">
+  Called when a drag operation starts.
+
+  ```tsx
+  useDragDropMonitor({
+    onDragStart: (event) => {
+      setActiveId(event.operation.source.id);
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="onDragMove" type="(event: DragMoveEvent, manager: DragDropManager) => void">
+  Called continuously while dragging. Use sparingly as this fires frequently.
+
+  ```tsx
+  useDragDropMonitor({
+    onDragMove: (event) => {
+      setPosition(event.operation.position);
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="onDragOver" type="(event: DragOverEvent, manager: DragDropManager) => void">
+  Called when dragging over a droppable element.
+
+  ```tsx
+  useDragDropMonitor({
+    onDragOver: (event) => {
+      console.log('Over:', event.operation.target?.id);
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="onDragEnd" type="(event: DragEndEvent, manager: DragDropManager) => void">
+  Called when a drag operation ends.
+
+  ```tsx
+  useDragDropMonitor({
+    onDragEnd: (event) => {
+      if (!event.canceled) {
+        handleDrop(event.operation.source, event.operation.target);
+      }
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="onCollision" type="(event: CollisionEvent, manager: DragDropManager) => void">
+  Called when collision detection identifies potential drop targets.
+</ParamField>
+
+### Examples
+
+#### Event Logger
+
+```tsx
+function EventLogger() {
+  const [events, setEvents] = useState([]);
+
+  useDragDropMonitor({
+    onDragStart: (event) => {
+      setEvents((prev) => [...prev, `Started: ${event.operation.source.id}`]);
+    },
+    onDragOver: (event) => {
+      setEvents((prev) => [
+        ...prev,
+        `Over: ${event.operation.target?.id ?? 'none'}`,
+      ]);
+    },
+    onDragEnd: (event) => {
+      setEvents((prev) => [
+        ...prev,
+        `Ended: ${event.canceled ? 'canceled' : 'completed'}`,
+      ]);
+    },
+  });
+
+  return (
+    <div>
+      <h3>Event Log</h3>
+      <ul>
+        {events.map((event, i) => (
+          <li key={i}>{event}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+#### State Synchronization
+
+```tsx
+function DragStateSync() {
+  const [isDragging, setIsDragging] = useState(false);
+  const [currentTarget, setCurrentTarget] = useState(null);
+
+  useDragDropMonitor({
+    onDragStart: () => setIsDragging(true),
+    onDragOver: (event) => setCurrentTarget(event.operation.target?.id),
+    onDragEnd: () => {
+      setIsDragging(false);
+      setCurrentTarget(null);
+    },
+  });
+
+  return (
+    <div>
+      <p>Dragging: {isDragging ? 'Yes' : 'No'}</p>
+      <p>Target: {currentTarget ?? 'None'}</p>
+    </div>
+  );
+}
+```
+
+#### Analytics Tracking
+
+```tsx
+function AnalyticsTracker() {
+  useDragDropMonitor({
+    onDragEnd: (event) => {
+      if (event.canceled) {
+        analytics.track('drag_canceled', {
+          sourceId: event.operation.source.id,
+        });
+      } else {
+        analytics.track('drag_completed', {
+          sourceId: event.operation.source.id,
+          targetId: event.operation.target?.id,
+        });
+      }
+    },
+  });
+
+  return null;
+}
+```
+
+---
+
+## useDragOperation
+
+Access the current drag operation state, including the drag source and target.
+
+### Usage
+
+```tsx
+import {useDragOperation} from '@dnd-kit/react';
+
+function DragStatus() {
+  const {source, target} = useDragOperation();
+
+  if (!source) {
+    return <div>Not dragging</div>;
+  }
+
+  return (
+    <div>
+      <p>Dragging: {source.id}</p>
+      <p>Target: {target?.id ?? 'None'}</p>
+    </div>
+  );
+}
+```
+
+### Return Value
+
+<ResponseField name="source" type="Draggable | null">
+  The draggable element currently being dragged, or `null` if no drag is active.
+
+  ```tsx
+  const {source} = useDragOperation();
+  console.log(source?.id, source?.data);
+  ```
+</ResponseField>
+
+<ResponseField name="target" type="Droppable | null">
+  The current drop target, or `null` if not over any droppable.
+
+  ```tsx
+  const {target} = useDragOperation();
+  console.log(target?.id, target?.data);
+  ```
+</ResponseField>
+
+### Examples
+
+#### Drag Preview
+
+```tsx
+function DragPreview() {
+  const {source, target} = useDragOperation();
+
+  if (!source) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 20,
+        right: 20,
+        padding: '10px',
+        background: 'white',
+        border: '1px solid black',
+        borderRadius: '4px',
+      }}
+    >
+      <p>Dragging: {source.data.label}</p>
+      {target ? (
+        <p>Target: {target.data.label}</p>
+      ) : (
+        <p>No target</p>
+      )}
+    </div>
+  );
+}
+```
+
+#### Conditional Rendering
+
+```tsx
+function DropHelper() {
+  const {source, target} = useDragOperation();
+  const canDrop = source && target && isCompatible(source, target);
+
+  if (!source) return null;
+
+  return (
+    <div className="drop-helper">
+      {canDrop ? (
+        <span style={{color: 'green'}}>✓ Can drop here</span>
+      ) : (
+        <span style={{color: 'red'}}>✗ Cannot drop here</span>
+      )}
+    </div>
+  );
+}
+
+function isCompatible(source, target) {
+  return source.data.type === target.data.acceptType;
+}
+```
+
+#### Global Drag Indicator
+
+```tsx
+function GlobalDragIndicator() {
+  const {source} = useDragOperation();
+
+  if (!source) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        padding: '10px',
+        background: '#2196f3',
+        color: 'white',
+        textAlign: 'center',
+        zIndex: 1000,
+      }}
+    >
+      Dragging: {source.data.label}
+    </div>
+  );
+}
+```
+
+### Type Parameters
+
+```tsx
+interface ItemData {
+  label: string;
+  category: string;
+}
+
+const {source, target} = useDragOperation<ItemData>();
+// source.data and target.data are typed as ItemData
+```
+
+---
+
+## Type Safety
+
+All hooks support TypeScript generics for type-safe data:
+
+```tsx
+interface TaskData {
+  title: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+function TaskMonitor() {
+  const manager = useDragDropManager<TaskData>();
+  const {source, target} = useDragOperation<TaskData>();
+
+  useDragDropMonitor<TaskData>({
+    onDragEnd: (event) => {
+      // event.operation.source.data is typed as TaskData
+      console.log(event.operation.source.data.title);
+    },
+  });
+
+  return <div>{source?.data.title}</div>;
+}
+```
+
+## Related
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Context provider for drag and drop
+- [useDraggable](/api/react/use-draggable) — Make elements draggable
+- [useDroppable](/api/react/use-droppable) — Create drop targets

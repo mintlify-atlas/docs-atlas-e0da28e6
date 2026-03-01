@@ -1,0 +1,579 @@
+---
+title: Performance Optimization
+description: Optimize drag and drop performance for large lists, complex interfaces, and resource-constrained devices
+---
+
+Dnd-kit is designed for high performance, but large lists and complex interfaces require optimization strategies. Learn how to maintain smooth 60fps drag operations.
+
+## React Performance Optimization
+
+### Memoize Sortable Components
+
+Use `memo` to prevent unnecessary re-renders:
+
+```tsx
+import {memo} from 'react';
+
+const SortableItem = memo(function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{opacity: isDragging ? 0.5 : 1}}
+    >
+      Item {id}
+    </div>
+  );
+});
+```
+
+### Optimize State Updates
+
+Batch state updates and avoid inline object creation:
+
+```tsx
+// Bad: Creates new object on every render
+function SortableItem({id, index}) {
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    data: {id, timestamp: Date.now()},  // New object every render!
+  });
+}
+
+// Good: Stable data reference
+function SortableItem({id, index}) {
+  const data = useMemo(() => ({
+    id,
+    category: 'items',
+  }), [id]);
+
+  const {isDragging} = useSortable({id, index, element, data});
+}
+```
+
+### Stable Callback References
+
+Use `useCallback` for event handlers:
+
+```tsx
+function App() {
+  const [items, setItems] = useState([...]);
+
+  const handleDragEnd = useCallback((event) => {
+    if (event.canceled) return;
+    setItems((items) => move(items, event));
+  }, []);  // Stable reference
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      {items.map((id, index) => (
+        <SortableItem key={id} id={id} index={index} />
+      ))}
+    </DragDropProvider>
+  );
+}
+```
+
+## Virtualization for Large Lists
+
+For lists with hundreds or thousands of items, use virtualization:
+
+```tsx
+import {useVirtualizer} from '@tanstack/react-virtual';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+
+function VirtualizedSortableList() {
+  const [items, setItems] = useState(
+    Array.from({length: 10000}, (_, i) => i)
+  );
+  
+  const parentRef = useRef(null);
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50,
+    overscan: 5,
+  });
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => setItems((items) => move(items, event))}
+    >
+      <div ref={parentRef} style={{height: '600px', overflow: 'auto'}}>
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const id = items[virtualItem.index];
+            return (
+              <VirtualSortableItem
+                key={id}
+                id={id}
+                index={virtualItem.index}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+
+const VirtualSortableItem = memo(function VirtualSortableItem({
+  id,
+  index,
+  style,
+}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        ...style,
+        opacity: isDragging ? 0.5 : 1,
+        height: 50,
+        padding: 12,
+        border: '1px solid #ddd',
+      }}
+    >
+      Item {id}
+    </div>
+  );
+});
+```
+
+<Warning>
+Virtualization works best with fixed-height items. Variable heights require additional complexity and may impact performance.
+</Warning>
+
+## Optimizing Transitions
+
+### Disable Transitions for Large Lists
+
+For lists with 100+ items, consider disabling transitions:
+
+```tsx
+function SortableItem({id, index}) {
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    transition: null,  // No animation for better performance
+  });
+}
+```
+
+### Conditional Transitions
+
+Only animate items near the drag operation:
+
+```tsx
+function SortableItem({id, index, activeIndex}) {
+  const [element, setElement] = useState(null);
+  
+  // Only transition if within 5 positions of active item
+  const shouldTransition = Math.abs(index - activeIndex) <= 5;
+  
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    transition: shouldTransition
+      ? {duration: 250, easing: 'ease-out'}
+      : null,
+  });
+}
+```
+
+### Reduce Transition Duration
+
+Shorter transitions improve perceived performance:
+
+```tsx
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  transition: {
+    duration: 150,  // Faster = snappier feel
+    easing: 'ease-out',
+  },
+});
+```
+
+## Sensor Configuration
+
+### Optimize Pointer Sensor
+
+Reduce activation constraints for faster response:
+
+```tsx
+import {PointerSensor} from '@dnd-kit/dom/sensors/pointer';
+
+const optimizedPointer = PointerSensor.configure({
+  activationConstraints: (event) => {
+    // No constraints for mouse = instant activation
+    if (event.pointerType === 'mouse') {
+      return undefined;
+    }
+    
+    // Minimal delay for touch
+    return [
+      new PointerActivationConstraints.Delay({value: 100, tolerance: 5}),
+    ];
+  },
+});
+
+<DragDropProvider sensors={[optimizedPointer]}>
+  {/* Your content */}
+</DragDropProvider>
+```
+
+### Throttle Move Events
+
+For complex collision detection, throttle move updates:
+
+```tsx
+import {throttle} from 'lodash-es';
+
+function App() {
+  const [items, setItems] = useState([...]);
+  
+  // Throttle drag move events to every 16ms (60fps)
+  const handleDragMove = useMemo(
+    () => throttle((event) => {
+      // Custom move handling
+    }, 16),
+    []
+  );
+
+  return (
+    <DragDropProvider
+      onDragMove={handleDragMove}
+      onDragEnd={(e) => setItems(move(items, e))}
+    >
+      {/* Items */}
+    </DragDropProvider>
+  );
+}
+```
+
+## Collision Detection Optimization
+
+### Use Efficient Collision Detectors
+
+Choose the right collision detector for your use case:
+
+```tsx
+import {
+  closestCenter,      // Fast, good for sortables
+  closestCorners,     // More precise, slightly slower
+  pointerWithin,      // Very fast, pointer-based
+  rectIntersection,   // Precise, slower for many items
+} from '@dnd-kit/collision';
+
+function SortableItem({id, index}) {
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    collisionDetector: closestCenter,  // Fast for most cases
+  });
+}
+```
+
+### Custom Collision Priority
+
+Optimize collision detection order:
+
+```tsx
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  collisionPriority: index,  // Check items in index order
+});
+```
+
+## Render Optimization
+
+### Avoid Layout Thrashing
+
+Batch DOM reads and writes:
+
+```tsx
+// Bad: Read-write-read-write pattern
+items.forEach(item => {
+  const height = item.offsetHeight;  // Read
+  item.style.top = `${height}px`;    // Write
+});
+
+// Good: Batch reads, then writes
+const heights = items.map(item => item.offsetHeight);
+items.forEach((item, i) => {
+  item.style.top = `${heights[i]}px`;
+});
+```
+
+Dnd-kit handles this automatically, but be aware when adding custom code.
+
+### Use CSS Containment
+
+Help the browser optimize rendering:
+
+```css
+.sortable-item {
+  contain: layout style paint;
+}
+
+.sortable-container {
+  contain: layout;
+}
+```
+
+### will-change Hint
+
+For frequently animated elements:
+
+```css
+.sortable-item[data-dragging="true"] {
+  will-change: transform;
+}
+
+/* Remove when not dragging to save memory */
+.sortable-item:not([data-dragging="true"]) {
+  will-change: auto;
+}
+```
+
+<Tip>
+Use `will-change` sparingly. Overuse can actually hurt performance by consuming too much memory.
+</Tip>
+
+## Reduce Re-renders
+
+### Extract Static Content
+
+```tsx
+// Bad: Recreates content on every render
+function SortableItem({id, index}) {
+  const {isDragging} = useSortable({id, index, element});
+  
+  return (
+    <div ref={setElement}>
+      <ExpensiveComponent data={complexData} />  {/* Re-renders often */}
+    </div>
+  );
+}
+
+// Good: Memoize expensive content
+const ItemContent = memo(function ItemContent({data}) {
+  return <ExpensiveComponent data={data} />;
+});
+
+function SortableItem({id, index, data}) {
+  const {isDragging} = useSortable({id, index, element});
+  
+  return (
+    <div ref={setElement} style={{opacity: isDragging ? 0.5 : 1}}>
+      <ItemContent data={data} />
+    </div>
+  );
+}
+```
+
+### Selective Re-rendering
+
+Only subscribe to necessary state:
+
+```tsx
+// Bad: Re-renders on any drag state change
+function SortableItem({id, index}) {
+  const {sortable} = useSortable({id, index, element});
+  // sortable object changes frequently
+  
+  return <div>{id}</div>;
+}
+
+// Good: Only re-render when isDragging changes
+function SortableItem({id, index}) {
+  const {isDragging} = useSortable({id, index, element});
+  // Only extracts isDragging boolean
+  
+  return <div style={{opacity: isDragging ? 0.5 : 1}}>{id}</div>;
+}
+```
+
+## Profiling and Debugging
+
+### Use React DevTools Profiler
+
+```tsx
+import {Profiler} from 'react';
+
+function App() {
+  const onRenderCallback = (
+    id,
+    phase,
+    actualDuration,
+    baseDuration,
+    startTime,
+    commitTime
+  ) => {
+    console.log(`${id} (${phase}) took ${actualDuration}ms`);
+  };
+
+  return (
+    <Profiler id="SortableList" onRender={onRenderCallback}>
+      <DragDropProvider>
+        {/* Your sortable list */}
+      </DragDropProvider>
+    </Profiler>
+  );
+}
+```
+
+### Monitor Frame Rate
+
+```tsx
+function useFrameRate() {
+  useEffect(() => {
+    let lastTime = performance.now();
+    let frames = 0;
+
+    function measureFPS() {
+      const currentTime = performance.now();
+      frames++;
+
+      if (currentTime >= lastTime + 1000) {
+        console.log(`FPS: ${frames}`);
+        frames = 0;
+        lastTime = currentTime;
+      }
+
+      requestAnimationFrame(measureFPS);
+    }
+
+    const rafId = requestAnimationFrame(measureFPS);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+}
+```
+
+## Production Optimizations
+
+### Code Splitting
+
+Lazy load drag and drop functionality:
+
+```tsx
+import {lazy, Suspense} from 'react';
+
+const SortableList = lazy(() => import('./SortableList'));
+
+function App() {
+  const [showSortable, setShowSortable] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setShowSortable(true)}>
+        Enable Sorting
+      </button>
+      
+      {showSortable && (
+        <Suspense fallback={<div>Loading...</div>}>
+          <SortableList />
+        </Suspense>
+      )}
+    </>
+  );
+}
+```
+
+### Tree Shaking
+
+Import only what you need:
+
+```tsx
+// Good: Import specific functions
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+
+// Avoid: Importing entire packages
+import * as DndKit from '@dnd-kit/react';
+```
+
+## Performance Checklist
+
+<Steps>
+  <Step title="Memoize Components">
+    Use `memo` on all sortable items
+  </Step>
+  
+  <Step title="Optimize Callbacks">
+    Use `useCallback` for event handlers
+  </Step>
+  
+  <Step title="Consider Virtualization">
+    For lists with 100+ items, implement virtualization
+  </Step>
+  
+  <Step title="Tune Transitions">
+    Adjust or disable animations for large lists
+  </Step>
+  
+  <Step title="Profile in Production">
+    Test performance with production builds and realistic data
+  </Step>
+  
+  <Step title="Monitor Bundle Size">
+    Use tools like webpack-bundle-analyzer to track dependencies
+  </Step>
+</Steps>
+
+## Common Performance Pitfalls
+
+<Warning>
+**Avoid These Mistakes:**
+
+- Creating new objects/arrays in render
+- Using array index as `key` when items can be added/removed
+- Inline styles that create new objects on every render
+- Not memoizing expensive computations
+- Enabling `idle` transitions on large lists
+- Using complex collision detectors unnecessarily
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Measure Baseline Performance">
+    Profile your current implementation to identify bottlenecks
+  </Step>
+  
+  <Step title="Apply Optimizations Incrementally">
+    Start with the highest-impact optimizations first
+  </Step>
+  
+  <Step title="Test on Real Devices">
+    Verify performance on mobile devices and low-end hardware
+  </Step>
+</Steps>

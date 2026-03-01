@@ -1,0 +1,337 @@
+---
+title: Collision Detection Algorithms
+description: API reference for collision detection algorithms in dnd-kit
+---
+
+Collision detection algorithms determine which droppable element should be activated when a draggable element is moved. Each algorithm has different characteristics and use cases.
+
+## defaultCollisionDetection
+
+The default collision detection algorithm that combines pointer and shape intersection detection.
+
+```typescript
+const defaultCollisionDetection: CollisionDetector
+```
+
+### Description
+
+Returns the droppable that has the greatest intersection area with the pointer coordinates. If there are no pointer coordinates, or the pointer is not intersecting with any droppable, returns the greatest intersection area between the collision shape and other intersecting droppable shapes.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing shape and position information
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for collision
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with `id`, `value`, `type`, and `priority` properties, or `null` if no collision is detected
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {defaultCollisionDetection} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  collisionDetector: defaultCollisionDetection,
+});
+```
+
+---
+
+## closestCenter
+
+Detects collisions based on the distance between the center of the draggable and the center of droppables.
+
+```typescript
+const closestCenter: CollisionDetector
+```
+
+### Description
+
+Returns the distance between the droppable shape and the drag operation shape. Falls back to `defaultCollisionDetection` if a collision is already detected.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing shape and position information
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for collision
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with `value` calculated as `1 / distance`, or `null` if the droppable has no shape
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {closestCenter} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  collisionDetector: closestCenter,
+});
+```
+
+---
+
+## closestCorners
+
+Detects collisions based on the average distance between the corners of draggable and droppable elements.
+
+```typescript
+const closestCorners: CollisionDetector
+```
+
+### Description
+
+Returns the distance between the corners of the droppable shape and the drag operation shape. Calculates the average distance between all four corners.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing shape and position information
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for collision
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with `value` calculated as `1 / (average corner distance)`, or `null` if the droppable has no shape
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {closestCorners} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Useful for grid layouts where corner alignment matters
+const manager = new DragDropManager({
+  collisionDetector: closestCorners,
+});
+```
+
+---
+
+## pointerIntersection
+
+A high precision collision detection algorithm that detects whether the pointer intersects with a droppable element.
+
+```typescript
+const pointerIntersection: CollisionDetector
+```
+
+### Description
+
+Returns the distance between the pointer coordinates and the center of the droppable element if the pointer is within the droppable element. Returns `null` if the pointer is outside of the droppable element.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing pointer position
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for pointer intersection
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with:
+  - `type`: `CollisionType.PointerIntersection`
+  - `priority`: `CollisionPriority.High`
+  - `value`: `1 / distance` from pointer to droppable center
+  
+  Returns `null` if pointer is outside the droppable
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {pointerIntersection} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Best for precise pointer-based interactions
+const manager = new DragDropManager({
+  collisionDetector: pointerIntersection,
+});
+```
+
+---
+
+## pointerDistance
+
+Detects collisions based on the distance between the pointer and the center of droppables.
+
+```typescript
+const pointerDistance: CollisionDetector
+```
+
+### Description
+
+Returns the distance between the droppable shape center and the drag operation pointer position. Unlike `pointerIntersection`, this algorithm doesn't require the pointer to be inside the droppable.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing pointer position
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for collision
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with `value` calculated as `1 / distance`, or `null` if the droppable has no shape
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {pointerDistance} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Useful when you want to detect the closest droppable
+// even if pointer isn't directly over it
+const manager = new DragDropManager({
+  collisionDetector: pointerDistance,
+});
+```
+
+---
+
+## shapeIntersection
+
+Detects collisions based on the intersection area between draggable and droppable shapes.
+
+```typescript
+const shapeIntersection: CollisionDetector
+```
+
+### Description
+
+Returns the droppable with the greatest intersection area with the collision shape. Uses both intersection ratio and distance to pointer for prioritization.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing shape information
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for shape intersection
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object with:
+  - `type`: `CollisionType.ShapeIntersection`
+  - `priority`: `CollisionPriority.Normal`
+  - `value`: `intersectionRatio / distance`
+  
+  Returns `null` if there's no intersection or shapes are missing
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {shapeIntersection} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Best for shape-based collision detection
+const manager = new DragDropManager({
+  collisionDetector: shapeIntersection,
+});
+```
+
+---
+
+## directionBiased
+
+A directional collision detection algorithm that prioritizes droppables in the direction of movement.
+
+```typescript
+const directionBiased: CollisionDetector
+```
+
+### Description
+
+Detects collisions based on the direction of drag movement. Only considers droppables that are positioned in the direction the draggable is moving. Falls back to `defaultCollisionDetection` when there's no movement direction.
+
+### Parameters
+
+<ParamField path="input.dragOperation" type="DragOperation" required>
+  The current drag operation containing shape, position, and direction information
+</ParamField>
+
+<ParamField path="input.droppable" type="Droppable" required>
+  The droppable element to check for collision
+</ParamField>
+
+### Returns
+
+<ResponseField name="collision" type="Collision | null">
+  Returns a collision object if the droppable is in the direction of movement, or `null` otherwise
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {directionBiased} from '@dnd-kit/collision';
+import {DragDropManager} from '@dnd-kit/dom';
+
+// Useful for keyboard navigation or directional sorting
+const manager = new DragDropManager({
+  collisionDetector: directionBiased,
+});
+```
+
+---
+
+## CollisionDetector Type
+
+All collision detection algorithms implement the `CollisionDetector` type:
+
+```typescript
+type CollisionDetector = (input: {
+  dragOperation: DragOperation;
+  droppable: Droppable;
+}) => Collision | null;
+
+interface Collision {
+  id: UniqueIdentifier;
+  value: number;
+  type: CollisionType;
+  priority: CollisionPriority;
+}
+```
+
+## Choosing an Algorithm
+
+- **defaultCollisionDetection**: Best general-purpose algorithm, works well for most use cases
+- **closestCenter**: Good for free-form layouts where items can be placed anywhere
+- **closestCorners**: Ideal for grid layouts with precise positioning requirements
+- **pointerIntersection**: Use when you need high precision pointer-based interactions
+- **pointerDistance**: Good for detecting the nearest droppable without requiring direct overlap
+- **shapeIntersection**: Best when you want to base collisions on overlapping areas
+- **directionBiased**: Optimal for keyboard navigation or when direction of movement matters

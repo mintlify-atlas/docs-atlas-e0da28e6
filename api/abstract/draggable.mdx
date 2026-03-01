@@ -1,0 +1,496 @@
+---
+title: 'Draggable'
+description: 'Entities that can be dragged in drag and drop operations'
+---
+
+`Draggable` represents an entity that can be dragged in a drag and drop operation. It extends the base `Entity` class with draggable-specific functionality including sensor-based interaction handling, modifier-based behavior transformation, and status tracking.
+
+## Constructor
+
+Creates a new draggable entity.
+
+```typescript
+const draggable = new Draggable<T, U>(input, manager);
+```
+
+<ParamField path="input" type="DraggableInput<T>" required>
+  Configuration object for the draggable.
+
+  <Expandable title="DraggableInput properties">
+    <ParamField path="id" type="UniqueIdentifier" required>
+      Unique identifier for this draggable entity.
+
+      ```typescript
+      id: 'item-1'
+      // or
+      id: 123
+      ```
+    </ParamField>
+
+    <ParamField path="data" type="T" optional>
+      Arbitrary data associated with this entity.
+
+      ```typescript
+      data: {
+        label: 'Drag me',
+        category: 'important',
+        metadata: {...}
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="type" type="Type" optional>
+      Type/category for this draggable. Used for filtering and matching with droppables.
+
+      ```typescript
+      type: 'card'
+      // or
+      type: Symbol('card')
+      ```
+    </ParamField>
+
+    <ParamField path="sensors" type="Sensors" optional>
+      Array of sensor constructors or descriptors specific to this draggable.
+      These override the manager's sensors for this entity.
+
+      ```typescript
+      sensors: [PointerSensor, KeyboardSensor]
+      ```
+    </ParamField>
+
+    <ParamField path="modifiers" type="Modifiers" optional>
+      Array of modifier constructors or descriptors specific to this draggable.
+      These override the manager's modifiers for this entity.
+
+      ```typescript
+      modifiers: [SnapModifier.configure({gridSize: 20})]
+      ```
+    </ParamField>
+
+    <ParamField path="alignment" type="Alignment" optional>
+      Alignment configuration for positioning the draggable.
+
+      ```typescript
+      alignment: {x: 0.5, y: 0.5} // Center alignment
+      ```
+    </ParamField>
+
+    <ParamField path="plugins" type="Plugins" optional>
+      Per-entity plugin configuration descriptors.
+
+      ```typescript
+      plugins: [MyPlugin.configure({option: 'value'})]
+      ```
+    </ParamField>
+
+    <ParamField path="disabled" type="boolean" default="false" optional>
+      Whether the entity should initially be disabled.
+    </ParamField>
+
+    <ParamField path="register" type="boolean" default="true" optional>
+      Whether to automatically register with the manager when created.
+    </ParamField>
+
+    <ParamField path="effects" type="() => Effect[]" optional>
+      Array of effects that are set up when registered and cleaned up when unregistered.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="manager" type="U | undefined" required>
+  The drag and drop manager instance, or undefined for unmanaged entities.
+</ParamField>
+
+<ParamField path="T" type="extends Data" default="Data">
+  Type parameter for the data associated with this draggable.
+</ParamField>
+
+<ParamField path="U" type="extends DragDropManager<any, any>" default="DragDropManager<any, any>">
+  Type parameter for the manager type.
+</ParamField>
+
+## Properties
+
+### Inherited from Entity
+
+<ParamField path="id" type="UniqueIdentifier">
+  The unique identifier of the entity. Can be updated dynamically.
+
+  ```typescript
+  draggable.id = 'new-id';
+  ```
+</ParamField>
+
+<ParamField path="data" type="T" reactive>
+  The data associated with the entity.
+
+  ```typescript
+  draggable.data = {label: 'Updated label'};
+  ```
+</ParamField>
+
+<ParamField path="manager" type="U | undefined" reactive>
+  The drag and drop manager instance.
+
+  ```typescript
+  draggable.manager = newManager;
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean" reactive>
+  Whether the entity is disabled.
+
+  ```typescript
+  draggable.disabled = true;
+  ```
+</ParamField>
+
+### Draggable-Specific
+
+<ParamField path="type" type="Type | undefined" reactive>
+  The type/category of the draggable entity.
+
+  ```typescript
+  draggable.type = 'card';
+  ```
+</ParamField>
+
+<ParamField path="sensors" type="Sensors | undefined">
+  The sensors associated with this draggable entity.
+</ParamField>
+
+<ParamField path="modifiers" type="Modifiers | undefined" reactive>
+  The modifiers associated with this draggable entity.
+
+  ```typescript
+  draggable.modifiers = [SnapModifier];
+  ```
+</ParamField>
+
+<ParamField path="alignment" type="Alignment | undefined">
+  The alignment configuration for this draggable entity.
+</ParamField>
+
+<ParamField path="plugins" type="Plugins | undefined">
+  Per-entity plugin configuration descriptors.
+</ParamField>
+
+<ParamField path="status" type="DraggableStatus" reactive>
+  The current status of the draggable entity.
+
+  ```typescript
+  type DraggableStatus = 'idle' | 'dragging' | 'dropping';
+  ```
+
+  - `idle` - Not being dragged
+  - `dragging` - Currently being dragged
+  - `dropping` - Currently being dropped
+</ParamField>
+
+## Computed Properties
+
+### isDragSource
+
+<ParamField path="isDragSource" type="boolean" derived>
+  Checks if this draggable is the source of the current drag operation.
+
+  ```typescript
+  if (draggable.isDragSource) {
+    console.log('This item is being dragged');
+  }
+  ```
+
+  Returns `true` if this entity's ID matches the current drag operation's source ID.
+</ParamField>
+
+### isDragging
+
+<ParamField path="isDragging" type="boolean" derived>
+  Checks if this draggable is currently being dragged.
+
+  ```typescript
+  if (draggable.isDragging) {
+    console.log('Actively dragging');
+  }
+  ```
+
+  Returns `true` if the status is `'dragging'` and this is the drag source.
+</ParamField>
+
+### isDropping
+
+<ParamField path="isDropping" type="boolean" derived>
+  Checks if this draggable is currently being dropped.
+
+  ```typescript
+  if (draggable.isDropping) {
+    console.log('Drop animation in progress');
+  }
+  ```
+
+  Returns `true` if the status is `'dropping'` and this is the drag source.
+</ParamField>
+
+## Methods
+
+### pluginConfig()
+
+Looks up per-entity options for a given plugin constructor.
+
+```typescript
+const options = draggable.pluginConfig(MyPlugin);
+```
+
+<ParamField path="plugin" type="PluginConstructor" required>
+  The plugin constructor to look up configuration for.
+</ParamField>
+
+<ResponseField name="return" type="PluginOptions | undefined">
+  The plugin options if configured for this entity, undefined otherwise.
+</ResponseField>
+
+### Inherited from Entity
+
+### register()
+
+Registers the entity with its manager.
+
+```typescript
+const cleanup = draggable.register();
+```
+
+<ResponseField name="return" type="CleanupFunction | void">
+  A cleanup function to unregister the entity, or void if no manager is set.
+</ResponseField>
+
+### unregister()
+
+Unregisters the entity from its manager.
+
+```typescript
+draggable.unregister();
+```
+
+### destroy()
+
+Cleans up the entity when it's no longer needed.
+
+```typescript
+draggable.destroy();
+```
+
+This method unregisters the entity from the manager and cleans up any resources.
+
+## Usage Examples
+
+### Basic Draggable
+
+```typescript
+import {Draggable, DragDropManager} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager();
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    data: {label: 'Drag me', index: 0}
+  },
+  manager
+);
+```
+
+### With Type
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'card-1',
+    type: 'card', // Only droppable zones accepting 'card' type will accept this
+    data: {title: 'Task 1', status: 'todo'}
+  },
+  manager
+);
+```
+
+### With Custom Sensors
+
+```typescript
+import {PointerSensor, KeyboardSensor} from '@dnd-kit/dom/sensors';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    sensors: [PointerSensor, KeyboardSensor],
+    data: {label: 'Accessible drag item'}
+  },
+  manager
+);
+```
+
+### With Modifiers
+
+```typescript
+import {SnapModifier} from '@dnd-kit/abstract/modifiers';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    modifiers: [SnapModifier.configure({gridSize: 20})],
+    data: {label: 'Snaps to grid'}
+  },
+  manager
+);
+```
+
+### With Alignment
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    alignment: {x: 0.5, y: 0.5}, // Center alignment
+    data: {label: 'Centered'}
+  },
+  manager
+);
+```
+
+### Checking Status
+
+```typescript
+const draggable = new Draggable({id: 'item-1'}, manager);
+
+// Check if being dragged
+if (draggable.isDragging) {
+  console.log('This item is being dragged');
+}
+
+// Check status value
+switch (draggable.status) {
+  case 'idle':
+    console.log('Ready to drag');
+    break;
+  case 'dragging':
+    console.log('Dragging in progress');
+    break;
+  case 'dropping':
+    console.log('Drop animation');
+    break;
+}
+```
+
+### Dynamic Updates
+
+```typescript
+const draggable = new Draggable({id: 'item-1'}, manager);
+
+// Update data
+draggable.data = {label: 'Updated label'};
+
+// Disable dragging
+draggable.disabled = true;
+
+// Change type
+draggable.type = 'special-card';
+
+// Update modifiers
+draggable.modifiers = [NewModifier];
+```
+
+### TypeScript Types
+
+```typescript
+interface CardData {
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+const draggable = new Draggable<CardData>(
+  {
+    id: 'card-1',
+    data: {
+      title: 'My Task',
+      description: 'Complete this task',
+      priority: 'high'
+    }
+  },
+  manager
+);
+
+// TypeScript knows the shape of data
+const title = draggable.data.title; // string
+```
+
+### Manual Registration
+
+```typescript
+// Create without auto-registration
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    register: false
+  },
+  manager
+);
+
+// Register later
+const cleanup = draggable.register();
+
+// Unregister
+cleanup();
+// or
+draggable.unregister();
+```
+
+### With Effects
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    effects: () => [
+      // Effect runs when entity is registered
+      () => {
+        console.log('Draggable registered');
+        
+        // Cleanup runs when unregistered
+        return () => {
+          console.log('Draggable unregistered');
+        };
+      }
+    ]
+  },
+  manager
+);
+```
+
+### Plugin Configuration
+
+```typescript
+import {MyPlugin} from './my-plugin';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    plugins: [
+      MyPlugin.configure({
+        option1: 'value1',
+        option2: true
+      })
+    ]
+  },
+  manager
+);
+
+// Retrieve plugin config
+const config = draggable.pluginConfig(MyPlugin);
+console.log(config); // {option1: 'value1', option2: true}
+```
+
+## See Also
+
+- [DragDropManager](/api/abstract/drag-drop-manager) - Managing drag operations
+- [Droppable](/api/abstract/droppable) - Creating drop targets
+- [Sensors](/api/abstract/sensors) - Handling user input
+- [Modifiers](/api/abstract/modifiers) - Transforming drag behavior

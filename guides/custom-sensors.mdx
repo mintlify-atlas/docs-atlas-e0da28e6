@@ -1,0 +1,526 @@
+---
+title: Creating Custom Sensors
+description: Build custom input sensors to handle specialized drag and drop interactions beyond mouse, touch, and keyboard
+---
+
+Sensors detect and handle user input for drag operations. While dnd-kit provides built-in sensors for pointer, keyboard, and native drag events, you can create custom sensors for specialized interactions.
+
+## Understanding Sensors
+
+Sensors extend the base `Sensor` class and implement input detection:
+
+```typescript
+import {Sensor} from '@dnd-kit/abstract';
+import type {CleanupFunction} from '@dnd-kit/state';
+import type {DragDropManager, Draggable} from '@dnd-kit/dom';
+
+export class CustomSensor extends Sensor<DragDropManager, CustomSensorOptions> {
+  constructor(
+    public manager: DragDropManager,
+    public options?: CustomSensorOptions
+  ) {
+    super(manager, options);
+  }
+
+  // Bind sensor to a draggable element
+  public bind(source: Draggable, options?: CustomSensorOptions): CleanupFunction {
+    // Set up event listeners
+    const cleanup = () => {
+      // Remove event listeners
+    };
+    
+    return cleanup;
+  }
+
+  // Cleanup when sensor is destroyed
+  public destroy() {
+    // Remove any global listeners
+  }
+}
+```
+
+## Built-in Sensors
+
+### Pointer Sensor
+
+Handles mouse, touch, and pen input:
+
+```tsx
+import {PointerSensor} from '@dnd-kit/dom/sensors/pointer';
+
+const customPointer = PointerSensor.configure({
+  // Activation constraints
+  activationConstraints: (event, source) => {
+    if (event.pointerType === 'touch') {
+      return [
+        new PointerActivationConstraints.Delay({value: 250, tolerance: 5}),
+      ];
+    }
+    return undefined;  // No constraints for mouse
+  },
+  
+  // Prevent activation on certain elements
+  preventActivation: (event, source) => {
+    const target = event.target;
+    return target.tagName === 'BUTTON' || target.tagName === 'A';
+  },
+});
+```
+
+### Keyboard Sensor
+
+Enables keyboard-based drag operations:
+
+```tsx
+import {KeyboardSensor} from '@dnd-kit/dom/sensors/keyboard';
+
+const customKeyboard = KeyboardSensor.configure({
+  // Movement offset per keypress
+  offset: {x: 20, y: 20},
+  
+  // Custom key mappings
+  keyboardCodes: {
+    start: ['Space'],
+    cancel: ['Escape'],
+    end: ['Space', 'Enter'],
+    up: ['ArrowUp', 'KeyW'],
+    down: ['ArrowDown', 'KeyS'],
+    left: ['ArrowLeft', 'KeyA'],
+    right: ['ArrowRight', 'KeyD'],
+  },
+});
+```
+
+### Drag Sensor
+
+Uses native HTML drag and drop API:
+
+```tsx
+import {DragSensor} from '@dnd-kit/dom/sensors/drag';
+
+<DragDropProvider sensors={[DragSensor]}>
+  {/* Your content */}
+</DragDropProvider>
+```
+
+## Creating a Custom Sensor
+
+Let's build a custom sensor that activates drag with a double-click:
+
+### Step 1: Define the Sensor Class
+
+```typescript
+import {Sensor, configurator} from '@dnd-kit/abstract';
+import {effect} from '@dnd-kit/state';
+import type {CleanupFunction} from '@dnd-kit/state';
+import {Listeners, getEventCoordinates} from '@dnd-kit/dom/utilities';
+import type {DragDropManager, Draggable} from '@dnd-kit/dom';
+
+export interface DoubleClickSensorOptions {
+  /**
+   * Maximum time between clicks (ms)
+   */
+  delay?: number;
+}
+
+const defaults = {
+  delay: 300,
+};
+
+export class DoubleClickSensor extends Sensor<
+  DragDropManager,
+  DoubleClickSensorOptions
+> {
+  private listeners = new Listeners();
+  private lastClickTime = 0;
+
+  constructor(
+    public manager: DragDropManager,
+    public options?: DoubleClickSensorOptions
+  ) {
+    super(manager, options);
+  }
+
+  public bind(source: Draggable, options = this.options): CleanupFunction {
+    const {delay = defaults.delay} = options ?? {};
+
+    const unbind = effect(() => {
+      const element = source.handle ?? source.element;
+      if (!element) return;
+
+      const handleClick = (event: MouseEvent) => {
+        if (source.disabled) return;
+
+        const now = Date.now();
+        const timeSinceLastClick = now - this.lastClickTime;
+
+        if (timeSinceLastClick < delay) {
+          // Double click detected
+          this.handleDoubleClick(event, source);
+          this.lastClickTime = 0;
+        } else {
+          // First click
+          this.lastClickTime = now;
+        }
+      };
+
+      element.addEventListener('click', handleClick);
+
+      return () => {
+        element.removeEventListener('click', handleClick);
+      };
+    });
+
+    return unbind;
+  }
+
+  private handleDoubleClick(event: MouseEvent, source: Draggable) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const coordinates = getEventCoordinates(event);
+    if (!coordinates) return;
+
+    // Start drag operation
+    const controller = this.manager.actions.start({
+      event,
+      coordinates,
+      source,
+    });
+
+    if (controller.signal.aborted) return;
+
+    // Set up listeners for drag movement and end
+    this.setupDragListeners(source);
+  }
+
+  private setupDragListeners(source: Draggable) {
+    const cleanup = this.listeners.bind(document, [
+      {
+        type: 'mousemove',
+        listener: (event: MouseEvent) => this.handleMove(event),
+      },
+      {
+        type: 'mouseup',
+        listener: (event: MouseEvent) => this.handleEnd(event),
+      },
+      {
+        type: 'keydown',
+        listener: (event: KeyboardEvent) => {
+          if (event.code === 'Escape') {
+            this.handleEnd(event, true);
+          }
+        },
+      },
+    ]);
+
+    return cleanup;
+  }
+
+  private handleMove(event: MouseEvent) {
+    const coordinates = getEventCoordinates(event);
+    if (!coordinates) return;
+
+    if (this.manager.dragOperation.status.idle) {
+      this.manager.actions.start({event, coordinates});
+    } else {
+      this.manager.actions.move({to: coordinates});
+    }
+  }
+
+  private handleEnd(event: Event, canceled = false) {
+    this.manager.actions.stop({event, canceled});
+    this.listeners.clear();
+  }
+
+  public destroy() {
+    this.listeners.clear();
+  }
+
+  static configure = configurator(DoubleClickSensor);
+}
+```
+
+### Step 2: Use the Custom Sensor
+
+```tsx
+import {DragDropProvider} from '@dnd-kit/react';
+import {DoubleClickSensor} from './DoubleClickSensor';
+
+function App() {
+  return (
+    <DragDropProvider
+      sensors={[
+        DoubleClickSensor.configure({delay: 400}),
+      ]}
+    >
+      {/* Your draggable content */}
+    </DragDropProvider>
+  );
+}
+```
+
+## Activation Constraints
+
+Add constraints to control when dragging activates:
+
+### Delay Constraint
+
+```tsx
+import {PointerSensor} from '@dnd-kit/dom/sensors/pointer';
+import {PointerActivationConstraints} from '@dnd-kit/dom/sensors/pointer';
+
+const pointerWithDelay = PointerSensor.configure({
+  activationConstraints: [
+    // Must hold for 250ms within 5px tolerance
+    new PointerActivationConstraints.Delay({value: 250, tolerance: 5}),
+  ],
+});
+```
+
+### Distance Constraint
+
+```tsx
+const pointerWithDistance = PointerSensor.configure({
+  activationConstraints: [
+    // Must move at least 10px to activate
+    new PointerActivationConstraints.Distance({value: 10}),
+  ],
+});
+```
+
+### Combined Constraints
+
+```tsx
+const combinedConstraints = PointerSensor.configure({
+  activationConstraints: (event, source) => {
+    if (event.pointerType === 'touch') {
+      // Touch requires delay
+      return [
+        new PointerActivationConstraints.Delay({value: 250, tolerance: 5}),
+      ];
+    }
+    
+    // Mouse requires distance
+    return [
+      new PointerActivationConstraints.Distance({value: 5}),
+    ];
+  },
+});
+```
+
+## Sensor Utilities
+
+The `@dnd-kit/dom/utilities` package provides helpful utilities:
+
+### Event Coordinates
+
+```typescript
+import {getEventCoordinates} from '@dnd-kit/dom/utilities';
+
+const coordinates = getEventCoordinates(event);
+// Returns {x: number, y: number} or undefined
+```
+
+### Event Listeners Manager
+
+```typescript
+import {Listeners} from '@dnd-kit/dom/utilities';
+
+const listeners = new Listeners();
+
+// Bind multiple listeners
+listeners.bind(element, [
+  {type: 'mousedown', listener: handleMouseDown},
+  {type: 'mousemove', listener: handleMouseMove},
+  {type: 'mouseup', listener: handleMouseUp, options: {capture: true}},
+]);
+
+// Clean up all listeners
+listeners.clear();
+```
+
+### Type Guards
+
+```typescript
+import {
+  isPointerEvent,
+  isKeyboardEvent,
+  isElement,
+  isHTMLElement,
+  isTextInput,
+  isInteractiveElement,
+} from '@dnd-kit/dom/utilities';
+
+if (isPointerEvent(event)) {
+  console.log(event.clientX, event.clientY);
+}
+```
+
+## Using Multiple Sensors
+
+Combine multiple sensors for comprehensive input support:
+
+```tsx
+import {PointerSensor} from '@dnd-kit/dom/sensors/pointer';
+import {KeyboardSensor} from '@dnd-kit/dom/sensors/keyboard';
+import {DoubleClickSensor} from './DoubleClickSensor';
+
+<DragDropProvider
+  sensors={[
+    PointerSensor.configure({/* options */}),
+    KeyboardSensor.configure({/* options */}),
+    DoubleClickSensor.configure({delay: 300}),
+  ]}
+>
+  {/* Your content */}
+</DragDropProvider>
+```
+
+<Warning>
+When using multiple sensors, ensure they don't conflict. For example, both PointerSensor and DoubleClickSensor listening to click events might interfere.
+</Warning>
+
+## Per-Entity Sensor Configuration
+
+Configure sensors differently for specific draggable items:
+
+```tsx
+function SortableItem({id, index, requiresDoubleClick}) {
+  const [element, setElement] = useState(null);
+  
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    sensors: requiresDoubleClick
+      ? [DoubleClickSensor.configure({delay: 400})]
+      : undefined,  // Use default sensors
+  });
+  
+  return <div ref={setElement}>{id}</div>;
+}
+```
+
+## Advanced: Gamepad Sensor Example
+
+Here's a more complex example using the Gamepad API:
+
+```typescript
+export class GamepadSensor extends Sensor<DragDropManager> {
+  private gamepadIndex: number | null = null;
+  private animationFrame: number | null = null;
+
+  public bind(source: Draggable): CleanupFunction {
+    const handleGamepadConnected = (event: GamepadEvent) => {
+      this.gamepadIndex = event.gamepad.index;
+      this.startPolling(source);
+    };
+
+    const handleGamepadDisconnected = () => {
+      this.stopPolling();
+      this.gamepadIndex = null;
+    };
+
+    window.addEventListener('gamepadconnected', handleGamepadConnected);
+    window.addEventListener('gamepaddisconnected', handleGamepadDisconnected);
+
+    return () => {
+      window.removeEventListener('gamepadconnected', handleGamepadConnected);
+      window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected);
+      this.stopPolling();
+    };
+  }
+
+  private startPolling(source: Draggable) {
+    const poll = () => {
+      if (this.gamepadIndex === null) return;
+
+      const gamepad = navigator.getGamepads()[this.gamepadIndex];
+      if (!gamepad) return;
+
+      // Map joystick to movement
+      const [x, y] = gamepad.axes;
+      const threshold = 0.2;
+
+      if (Math.abs(x) > threshold || Math.abs(y) > threshold) {
+        if (this.manager.dragOperation.status.idle) {
+          const element = source.element;
+          if (!element) return;
+          
+          const rect = element.getBoundingClientRect();
+          this.manager.actions.start({
+            event: null,
+            coordinates: {x: rect.left, y: rect.top},
+            source,
+          });
+        } else {
+          this.manager.actions.move({
+            by: {x: x * 10, y: y * 10},
+          });
+        }
+      }
+
+      // Check for drop button (button 0)
+      if (gamepad.buttons[0]?.pressed && !this.manager.dragOperation.status.idle) {
+        this.manager.actions.stop({event: null});
+      }
+
+      this.animationFrame = requestAnimationFrame(poll);
+    };
+
+    this.animationFrame = requestAnimationFrame(poll);
+  }
+
+  private stopPolling() {
+    if (this.animationFrame !== null) {
+      cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
+    }
+  }
+
+  public destroy() {
+    this.stopPolling();
+  }
+}
+```
+
+<Tip>
+When building custom sensors, use the `effect` function from `@dnd-kit/state` to automatically clean up when elements are removed from the DOM.
+</Tip>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Clean Up">
+    Return cleanup functions from `bind()` and implement `destroy()` to prevent memory leaks
+  </Step>
+  
+  <Step title="Respect Disabled State">
+    Check `source.disabled` before initiating drag operations
+  </Step>
+  
+  <Step title="Handle Edge Cases">
+    Test with missing elements, rapid interactions, and simultaneous input
+  </Step>
+  
+  <Step title="Provide Configuration">
+    Use the `configurator` helper to allow per-instance customization
+  </Step>
+</Steps>
+
+## Next Steps
+
+<Steps>
+  <Step title="Explore Source Code">
+    Study the built-in sensors in `packages/dom/src/core/sensors/`
+  </Step>
+  
+  <Step title="Test Thoroughly">
+    Test custom sensors across different devices and input methods
+  </Step>
+  
+  <Step title="Share Your Sensor">
+    Consider publishing reusable sensors as npm packages
+  </Step>
+</Steps>

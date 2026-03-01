@@ -1,0 +1,380 @@
+---
+title: Accessibility Features
+description: Comprehensive examples demonstrating accessibility features and screen reader support in drag and drop interfaces
+---
+
+# Accessibility Features in Action
+
+The dnd-kit Accessibility plugin automatically enhances drag and drop interfaces with comprehensive keyboard support, screen reader announcements, and ARIA attributes. This guide demonstrates how to leverage these features.
+
+## The Accessibility Plugin
+
+The Accessibility plugin provides:
+
+- Automatic ARIA attributes for draggable elements
+- Live region announcements for screen readers
+- Hidden text instructions for keyboard users
+- Proper focus management
+- Debounced updates to prevent announcement spam
+
+## Basic Setup
+
+```typescript packages/dom/src/core/plugins/accessibility/Accessibility.ts
+import {DragDropManager} from '@dnd-kit/dom';
+import {Accessibility} from '@dnd-kit/dom/plugins';
+
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager),
+  ],
+});
+```
+
+That's it! The plugin automatically adds all necessary accessibility features.
+
+## Default Screen Reader Instructions
+
+The plugin provides default instructions that are read to screen reader users:
+
+```typescript packages/dom/src/core/plugins/accessibility/defaults.ts
+"To pick up a draggable item, press the space bar. While dragging, use the arrow keys to move the item in a given direction. Press space again to drop the item in its new position, or press escape to cancel."
+```
+
+## Custom Screen Reader Instructions
+
+Provide custom instructions tailored to your interface:
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      screenReaderInstructions: {
+        draggable: 'Press space to pick up this card. Use arrow keys to reorder. Press space again to drop, or escape to cancel.'
+      },
+    }),
+  ],
+});
+```
+
+## Custom Announcements
+
+The plugin announces key events to screen readers. Customize these announcements:
+
+```typescript packages/dom/src/core/plugins/accessibility/defaults.ts
+import type {Announcements} from '@dnd-kit/dom/plugins';
+
+const customAnnouncements: Announcements = {
+  dragstart({operation: {source}}) {
+    if (!source) return;
+    
+    const itemName = source.element?.getAttribute('aria-label') || source.id;
+    return `Picked up ${itemName}. Use arrow keys to move.`;
+  },
+  
+  dragover({operation: {source, target}}) {
+    if (!source || source.id === target?.id) return;
+    
+    const sourceName = source.element?.getAttribute('aria-label') || source.id;
+    
+    if (target) {
+      const targetName = target.element?.getAttribute('aria-label') || target.id;
+      return `${sourceName} is over ${targetName}. Press space to drop.`;
+    }
+    
+    return `${sourceName} is no longer over a drop target.`;
+  },
+  
+  dragend({operation: {source, target}, canceled}) {
+    if (!source) return;
+    
+    const sourceName = source.element?.getAttribute('aria-label') || source.id;
+    
+    if (canceled) {
+      return `Canceled. ${sourceName} returned to starting position.`;
+    }
+    
+    if (target) {
+      const targetName = target.element?.getAttribute('aria-label') || target.id;
+      return `Dropped ${sourceName} on ${targetName}.`;
+    }
+    
+    return `Dropped ${sourceName}.`;
+  },
+};
+
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      announcements: customAnnouncements,
+    }),
+  ],
+});
+```
+
+## Automatic ARIA Attributes
+
+The Accessibility plugin automatically adds and manages these attributes:
+
+```typescript packages/dom/src/core/plugins/accessibility/defaults.ts
+// Applied to draggable elements:
+role="button"
+aria-roledescription="draggable"
+aria-describedby="dnd-kit-description-{id}"
+aria-pressed="false"  // Changes to "true" when dragging
+aria-grabbed="false"  // Changes to "true" when dragging
+aria-disabled="false" // Reflects the disabled state
+tabindex="0"          // Makes elements keyboard focusable
+```
+
+## Example: Accessible Sortable List
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {Accessibility} from '@dnd-kit/dom/plugins';
+import {KeyboardSensor, PointerSensor} from '@dnd-kit/dom/sensors';
+
+// Create manager with accessibility
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      announcements: {
+        dragstart({operation: {source}}) {
+          if (!source) return;
+          
+          const index = source.data.get('index');
+          const total = source.data.get('total');
+          return `Picked up item ${index + 1} of ${total}.`;
+        },
+        
+        dragover({operation: {source, target}}) {
+          if (!source || !target || source.id === target.id) return;
+          
+          const sourceIndex = source.data.get('index');
+          const targetIndex = target.data.get('index');
+          
+          if (sourceIndex < targetIndex) {
+            return `Moving down. Currently over position ${targetIndex + 1}.`;
+          } else {
+            return `Moving up. Currently over position ${targetIndex + 1}.`;
+          }
+        },
+        
+        dragend({operation: {source, target}, canceled}) {
+          if (!source) return;
+          
+          const sourceIndex = source.data.get('index');
+          
+          if (canceled) {
+            return `Cancelled. Item returned to position ${sourceIndex + 1}.`;
+          }
+          
+          if (target) {
+            const targetIndex = target.data.get('index');
+            return `Item moved from position ${sourceIndex + 1} to position ${targetIndex + 1}.`;
+          }
+          
+          return `Item dropped at position ${sourceIndex + 1}.`;
+        },
+      },
+    }),
+  ],
+  sensors: [PointerSensor, KeyboardSensor],
+});
+
+// Register list items with position data
+const listItems = document.querySelectorAll('.sortable-item');
+listItems.forEach((element, index) => {
+  // Set accessible label
+  element.setAttribute('aria-label', `Task: ${element.textContent}`);
+  
+  // Register with position data for announcements
+  manager.registry.draggables.register(element, {
+    data: new Map([
+      ['index', index],
+      ['total', listItems.length],
+    ]),
+  });
+  
+  manager.registry.droppables.register(element, {
+    data: new Map([['index', index]]),
+  });
+});
+```
+
+## Debouncing Announcements
+
+By default, `dragover` and `dragmove` events are debounced to prevent overwhelming screen readers:
+
+```typescript packages/dom/src/core/plugins/accessibility/Accessibility.ts
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      debounce: 500, // milliseconds (default)
+    }),
+  ],
+});
+
+// Disable debouncing
+const manager2 = new DragDropManager({
+  plugins: [
+    new Accessibility(manager2, {
+      debounce: 0,
+    }),
+  ],
+});
+```
+
+## Example: Accessible Kanban Board
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {Accessibility} from '@dnd-kit/dom/plugins';
+import {KeyboardSensor, PointerSensor} from '@dnd-kit/dom/sensors';
+
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      screenReaderInstructions: {
+        draggable: 'Press space to pick up this task card. Use arrow keys to move between columns and positions. Press space to drop, or escape to cancel.',
+      },
+      announcements: {
+        dragstart({operation: {source}}) {
+          if (!source) return;
+          
+          const taskName = source.data.get('taskName');
+          const column = source.data.get('column');
+          const position = source.data.get('position');
+          
+          return `Picked up task: ${taskName}. Currently in ${column}, position ${position}.`;
+        },
+        
+        dragover({operation: {source, target}}) {
+          if (!source) return;
+          
+          const taskName = source.data.get('taskName');
+          
+          if (target && source.id !== target.id) {
+            const targetColumn = target.data.get('column');
+            const targetPosition = target.data.get('position');
+            
+            return `Task ${taskName} over ${targetColumn}, position ${targetPosition}.`;
+          }
+          
+          return `Task ${taskName} not over any column.`;
+        },
+        
+        dragend({operation: {source, target}, canceled}) {
+          if (!source) return;
+          
+          const taskName = source.data.get('taskName');
+          const sourceColumn = source.data.get('column');
+          
+          if (canceled) {
+            return `Cancelled. Task ${taskName} returned to ${sourceColumn}.`;
+          }
+          
+          if (target) {
+            const targetColumn = target.data.get('column');
+            const targetPosition = target.data.get('position');
+            
+            if (sourceColumn === targetColumn) {
+              return `Task ${taskName} moved to position ${targetPosition} in ${targetColumn}.`;
+            } else {
+              return `Task ${taskName} moved from ${sourceColumn} to ${targetColumn}, position ${targetPosition}.`;
+            }
+          }
+          
+          return `Task ${taskName} dropped.`;
+        },
+      },
+    }),
+  ],
+  sensors: [PointerSensor, KeyboardSensor],
+});
+
+// Register cards and columns
+const columns = ['To Do', 'In Progress', 'Done'];
+columns.forEach((columnName) => {
+  const column = document.querySelector(`[data-column="${columnName}"]`);
+  const cards = column.querySelectorAll('.kanban-card');
+  
+  // Set column label for screen readers
+  column.setAttribute('aria-label', `${columnName} column`);
+  
+  cards.forEach((card, position) => {
+    const taskName = card.querySelector('.task-name')?.textContent;
+    
+    // Set accessible label for the card
+    card.setAttribute('aria-label', taskName);
+    
+    // Register with metadata
+    manager.registry.draggables.register(card, {
+      data: new Map([
+        ['taskName', taskName],
+        ['column', columnName],
+        ['position', position + 1],
+      ]),
+    });
+    
+    manager.registry.droppables.register(card, {
+      data: new Map([
+        ['column', columnName],
+        ['position', position + 1],
+      ]),
+    });
+  });
+});
+```
+
+## Custom ID Prefixes
+
+Customize the IDs used for accessibility elements:
+
+```typescript packages/dom/src/core/plugins/accessibility/Accessibility.ts
+const manager = new DragDropManager({
+  plugins: [
+    new Accessibility(manager, {
+      id: 'my-app',
+      idPrefix: {
+        description: 'my-app-instructions',
+        announcement: 'my-app-announcements',
+      },
+    }),
+  ],
+});
+```
+
+## Best Practices
+
+1. **Provide meaningful labels**: Use `aria-label` on draggable elements to give them descriptive names.
+
+2. **Include context in announcements**: Tell users where items are and where they're going, not just what's happening.
+
+3. **Test with real screen readers**: Test with NVDA, JAWS, or VoiceOver to ensure announcements are clear.
+
+4. **Keep announcements concise**: Screen reader users appreciate brevity.
+
+5. **Use the KeyboardSensor**: Always include the KeyboardSensor for keyboard-only users.
+
+6. **Test keyboard navigation**: Ensure all functionality works with keyboard alone.
+
+7. **Provide visual focus indicators**: CSS focus styles are critical for keyboard users.
+
+8. **Consider announcement frequency**: Use the debounce option to prevent overwhelming users during rapid movements.
+
+## Safari Compatibility
+
+The plugin automatically handles Safari's unique requirements, ensuring elements are properly focusable even in Safari.
+
+## Live Region Implementation
+
+The plugin creates a visually hidden live region for announcements:
+
+```typescript packages/dom/src/core/plugins/accessibility/Accessibility.ts
+// Automatically created by the plugin
+aria-live="assertive"
+aria-atomic="true"
+role="status"
+```
+
+This ensures screen readers announce updates immediately without interrupting other content.

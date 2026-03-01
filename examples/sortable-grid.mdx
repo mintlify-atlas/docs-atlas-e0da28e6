@@ -1,0 +1,365 @@
+---
+title: 'Sortable Grid Layout'
+description: 'Create a drag-and-drop sortable grid with automatic flow and positioning'
+---
+
+## Overview
+
+Sortable grids extend the basic sortable list pattern to work with 2D layouts using CSS Grid. Items can be dragged and reordered across rows and columns, with automatic repositioning handled by the layout.
+
+## Basic Grid Example
+
+```tsx
+import React, {useState} from 'react';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+
+function GridItem({id, index}: {id: number; index: number}) {
+  const [element, setElement] = useState<Element | null>(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        cursor: 'grab',
+        fontSize: '24px',
+        fontWeight: 'bold',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+
+export default function GridApp() {
+  const [items, setItems] = useState(() =>
+    Array.from({length: 20}, (_, i) => i + 1)
+  );
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        setItems((items) => move(items, event));
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, 150px)',
+          gridAutoRows: 150,
+          gridAutoFlow: 'dense',
+          gap: 18,
+          padding: '0 30px',
+          maxWidth: 900,
+          marginInline: 'auto',
+          justifyContent: 'center',
+        }}
+      >
+        {items.map((id, index) => (
+          <GridItem key={id} id={id} index={index} />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Key Differences from Lists
+
+### CSS Grid Layout
+
+The main difference is in the container styling:
+
+```css
+display: grid;
+grid-template-columns: repeat(auto-fill, 150px);
+grid-auto-rows: 150px;
+grid-auto-flow: dense;
+gap: 18px;
+```
+
+- **`grid-template-columns`**: Defines column sizes with `auto-fill` for responsive wrapping
+- **`grid-auto-rows`**: Sets consistent row height
+- **`grid-auto-flow: dense`**: Fills gaps in the grid automatically
+- **`gap`**: Spacing between items
+
+### No Special Hook Configuration
+
+The `useSortable` hook works identically for grids - dnd-kit automatically detects the grid layout and handles 2D positioning:
+
+```tsx
+const {ref, isDragging} = useSortable({id, index, element});
+```
+
+dnd-kit's collision detection understands grid layouts and automatically calculates the correct drop position based on cursor location.
+
+## Responsive Grid
+
+Create grids that adapt to different screen sizes:
+
+```tsx
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gap: 16,
+    padding: 20,
+  }}
+>
+  {items.map((id, index) => (
+    <GridItem key={id} id={id} index={index} />
+  ))}
+</div>
+```
+
+Using `minmax()` allows items to grow and shrink while maintaining minimum dimensions.
+
+## Variable-Sized Items
+
+Create grids with items spanning multiple rows or columns:
+
+```tsx
+function GridItem({id, index, span}: {
+  id: number;
+  index: number;
+  span?: {rows?: number; columns?: number};
+}) {
+  const {ref, isDragging} = useSortable({id, index});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        gridColumn: span?.columns ? `span ${span.columns}` : undefined,
+        gridRow: span?.rows ? `span ${span.rows}` : undefined,
+        backgroundColor: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+
+// Usage
+<GridItem key={id} id={id} index={index} span={{columns: 2, rows: 1}} />
+```
+
+## Grid with Categories
+
+Combine grids with filtering or categorization:
+
+```tsx
+interface Item {
+  id: number;
+  category: string;
+}
+
+function CategorizedGrid() {
+  const [items, setItems] = useState<Item[]>([
+    {id: 1, category: 'A'},
+    {id: 2, category: 'B'},
+    {id: 3, category: 'A'},
+    // ...
+  ]);
+  const [filter, setFilter] = useState<string | null>(null);
+
+  const filtered = filter
+    ? items.filter(item => item.category === filter)
+    : items;
+
+  return (
+    <>
+      <div style={{marginBottom: 20}}>
+        <button onClick={() => setFilter(null)}>All</button>
+        <button onClick={() => setFilter('A')}>Category A</button>
+        <button onClick={() => setFilter('B')}>Category B</button>
+      </div>
+      
+      <DragDropProvider
+        onDragEnd={(event) => {
+          setItems((items) => move(items, event));
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, 150px)',
+            gap: 16,
+          }}
+        >
+          {filtered.map((item, index) => (
+            <GridItem key={item.id} id={item.id} index={index} />
+          ))}
+        </div>
+      </DragDropProvider>
+    </>
+  );
+}
+```
+
+## Advanced Grid Styling
+
+### Masonry Layout
+
+For Pinterest-style masonry layouts, use `grid-auto-flow: dense` with variable heights:
+
+```tsx
+function MasonryItem({id, index, height}: {
+  id: number;
+  index: number;
+  height: number;
+}) {
+  const {ref, isDragging} = useSortable({id, index});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        height: `${height}px`,
+        backgroundColor: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+### Grid with Gaps
+
+Create intentional empty spaces in your grid:
+
+```tsx
+const [items, setItems] = useState([
+  {id: 1, type: 'item'},
+  {id: 'gap-1', type: 'gap'},
+  {id: 2, type: 'item'},
+  // ...
+]);
+
+{items.map((item, index) => (
+  item.type === 'gap' ? (
+    <div key={item.id} /> // Empty grid cell
+  ) : (
+    <GridItem key={item.id} id={item.id} index={index} />
+  )
+))}
+```
+
+## Collision Detection
+
+By default, dnd-kit uses smart collision detection for grids. You can customize it:
+
+```tsx
+import {directionBiased} from '@dnd-kit/collision';
+
+function GridItem({id, index}) {
+  const {ref} = useSortable({
+    id,
+    index,
+    collisionDetector: directionBiased, // Prioritize horizontal/vertical movement
+  });
+
+  return <div ref={ref}>{id}</div>;
+}
+```
+
+## Performance Considerations
+
+1. **Limit grid size**: Grids with 100+ items may benefit from pagination or virtualization
+2. **Use CSS containment**: Add `contain: layout style paint` for better paint performance
+3. **Optimize animations**: Use `will-change` sparingly and only during drag operations
+
+```tsx
+<div
+  ref={ref}
+  style={{
+    contain: 'layout style paint',
+    willChange: isDragging ? 'transform' : 'auto',
+  }}
+>
+  {/* ... */}
+</div>
+```
+
+## Common Patterns
+
+### Photo Gallery Grid
+
+```tsx
+function PhotoGrid() {
+  const [photos, setPhotos] = useState([...]);
+
+  return (
+    <DragDropProvider onDragEnd={(event) => setPhotos(move(photos, event))}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: 12,
+          padding: 20,
+        }}
+      >
+        {photos.map((photo, index) => (
+          <GridItem key={photo.id} id={photo.id} index={index}>
+            <img src={photo.url} alt={photo.title} />
+          </GridItem>
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+### Dashboard Widget Grid
+
+```tsx
+function DashboardGrid() {
+  const [widgets, setWidgets] = useState([...]);
+
+  return (
+    <DragDropProvider onDragEnd={(event) => setWidgets(move(widgets, event))}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(12, 1fr)', // 12-column grid
+          gap: 16,
+          padding: 24,
+        }}
+      >
+        {widgets.map((widget, index) => (
+          <div
+            key={widget.id}
+            style={{
+              gridColumn: `span ${widget.width}`, // e.g., span 4
+              gridRow: `span ${widget.height}`, // e.g., span 2
+            }}
+          >
+            <GridItem id={widget.id} index={index}>
+              <Widget {...widget} />
+            </GridItem>
+          </div>
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Next Steps
+
+- Explore [multiple lists](/examples/multiple-lists) for drag-and-drop between different containers
+- Learn about [virtualized lists](/examples/virtualized-lists) for handling large datasets efficiently

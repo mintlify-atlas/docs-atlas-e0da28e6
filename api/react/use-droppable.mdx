@@ -1,0 +1,359 @@
+---
+title: 'useDroppable'
+description: 'Hook to create a drop target for draggable elements'
+---
+
+The `useDroppable` hook creates a drop target that can receive draggable elements. It registers the element with the drag and drop manager and provides reactive state about whether it's being targeted.
+
+## Usage
+
+```tsx
+import {useDroppable} from '@dnd-kit/react';
+
+function DroppableArea({id}) {
+  const {ref, isDropTarget} = useDroppable({id});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '20px',
+        border: isDropTarget ? '2px solid green' : '2px dashed gray',
+      }}
+    >
+      Drop here
+    </div>
+  );
+}
+```
+
+## Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for this droppable element. Used to track the element during drag operations.
+
+  ```tsx
+  const {ref} = useDroppable({id: 'droppable-1'});
+  ```
+</ParamField>
+
+<ParamField path="element" type="Element | RefObject<Element>">
+  The DOM element to make droppable. If not provided, use the `ref` from the return value.
+
+  ```tsx
+  const elementRef = useRef(null);
+  useDroppable({id: 'area', element: elementRef});
+  ```
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to this droppable. Accessible in event handlers when elements are dropped.
+
+  ```tsx
+  const {ref} = useDroppable({
+    id: 'category-a',
+    data: {category: 'A', maxItems: 10},
+  });
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Whether this droppable is disabled. Disabled droppables cannot receive drops.
+
+  ```tsx
+  const {ref} = useDroppable({
+    id: 'area',
+    disabled: true,
+  });
+  ```
+</ParamField>
+
+<ParamField path="accept" type="string | string[]">
+  Type or types of draggables this droppable accepts. If not specified, accepts all types.
+
+  ```tsx
+  // Accept only specific types
+  const {ref} = useDroppable({
+    id: 'area',
+    accept: ['file', 'folder'],
+  });
+  ```
+</ParamField>
+
+<ParamField path="type" type="string">
+  Type identifier for this droppable. Can be used with collision detection or custom logic.
+
+  ```tsx
+  const {ref} = useDroppable({
+    id: 'container',
+    type: 'container',
+  });
+  ```
+</ParamField>
+
+<ParamField path="collisionDetector" type="CollisionDetector">
+  Custom collision detection algorithm for this droppable. Defaults to `defaultCollisionDetection`.
+
+  ```tsx
+  import {closestCenter} from '@dnd-kit/collision';
+
+  const {ref} = useDroppable({
+    id: 'area',
+    collisionDetector: closestCenter,
+  });
+  ```
+</ParamField>
+
+## Return Value
+
+<ResponseField name="ref" type="(element: Element | null) => void">
+  Callback ref to attach to the droppable element.
+
+  ```tsx
+  const {ref} = useDroppable({id: 'area'});
+  return <div ref={ref}>Drop zone</div>;
+  ```
+</ResponseField>
+
+<ResponseField name="droppable" type="Droppable<T>">
+  The underlying `Droppable` instance. Access this for advanced use cases.
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="boolean">
+  Whether this element is currently the target of an active drag operation.
+
+  ```tsx
+  const {ref, isDropTarget} = useDroppable({id: 'area'});
+  return (
+    <div
+      ref={ref}
+      style={{
+        background: isDropTarget ? 'lightgreen' : 'white',
+      }}
+    >
+      {isDropTarget ? 'Release to drop' : 'Drop here'}
+    </div>
+  );
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Drop Zone
+
+```tsx
+function BasicDropZone() {
+  const {ref, isDropTarget} = useDroppable({id: 'zone'});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        minHeight: '200px',
+        padding: '20px',
+        border: isDropTarget ? '3px solid green' : '3px dashed gray',
+        background: isDropTarget ? 'rgba(0, 255, 0, 0.1)' : 'white',
+        transition: 'all 0.2s',
+      }}
+    >
+      {isDropTarget ? 'Release to drop!' : 'Drag items here'}
+    </div>
+  );
+}
+```
+
+### Droppable with Type Restrictions
+
+```tsx
+function CategoryDropZone({category}) {
+  const {ref, isDropTarget} = useDroppable({
+    id: `category-${category}`,
+    accept: ['item'], // Only accept draggables with type 'item'
+    data: {category},
+  });
+
+  return (
+    <div ref={ref} className={isDropTarget ? 'highlighted' : ''}>
+      <h3>Category {category}</h3>
+      <p>Drop items here</p>
+    </div>
+  );
+}
+```
+
+### Droppable with Custom Data
+
+```tsx
+interface DropZoneData {
+  category: string;
+  maxItems: number;
+}
+
+function SmartDropZone({category, maxItems, currentCount}) {
+  const isFull = currentCount >= maxItems;
+  
+  const {ref, isDropTarget} = useDroppable<DropZoneData>({
+    id: category,
+    disabled: isFull,
+    data: {category, maxItems},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: isFull ? 0.5 : 1,
+        border: isDropTarget ? '2px solid blue' : '2px solid gray',
+      }}
+    >
+      <h3>{category}</h3>
+      <p>
+        {currentCount} / {maxItems} items
+      </p>
+      {isFull && <span>Full - no more items allowed</span>}
+    </div>
+  );
+}
+```
+
+### Nested Droppables
+
+```tsx
+function NestedDroppables() {
+  const {ref: outerRef, isDropTarget: isOuterTarget} = useDroppable({
+    id: 'outer',
+    type: 'container',
+  });
+
+  const {ref: innerRef, isDropTarget: isInnerTarget} = useDroppable({
+    id: 'inner',
+    type: 'list',
+  });
+
+  return (
+    <div
+      ref={outerRef}
+      style={{
+        padding: '40px',
+        border: isOuterTarget ? '3px solid blue' : '3px solid gray',
+      }}
+    >
+      <h2>Outer Container</h2>
+      <div
+        ref={innerRef}
+        style={{
+          padding: '20px',
+          border: isInnerTarget ? '2px solid green' : '2px dashed gray',
+        }}
+      >
+        <h3>Inner List</h3>
+        <p>Drop items here</p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Multiple Drop Zones with Accept Types
+
+```tsx
+function FileManager() {
+  const {ref: folderRef, isDropTarget: isFolderTarget} = useDroppable({
+    id: 'folders',
+    accept: 'folder',
+  });
+
+  const {ref: fileRef, isDropTarget: isFileTarget} = useDroppable({
+    id: 'files',
+    accept: 'file',
+  });
+
+  const {ref: trashRef, isDropTarget: isTrashTarget} = useDroppable({
+    id: 'trash',
+    accept: ['file', 'folder'], // Accepts both types
+  });
+
+  return (
+    <div>
+      <div ref={folderRef} className={isFolderTarget ? 'highlight' : ''}>
+        Folders only
+      </div>
+      <div ref={fileRef} className={isFileTarget ? 'highlight' : ''}>
+        Files only
+      </div>
+      <div ref={trashRef} className={isTrashTarget ? 'highlight' : ''}>
+        🗑️ Trash (accepts anything)
+      </div>
+    </div>
+  );
+}
+```
+
+### Droppable List
+
+```tsx
+function DroppableList({items, onDrop}) {
+  const {ref, isDropTarget} = useDroppable({
+    id: 'list',
+    data: {type: 'list'},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        minHeight: '300px',
+        padding: '20px',
+        background: isDropTarget ? '#f0f8ff' : '#fafafa',
+        border: isDropTarget ? '2px solid #0066cc' : '1px solid #ddd',
+        borderRadius: '8px',
+      }}
+    >
+      {items.length === 0 ? (
+        <p style={{textAlign: 'center', color: '#999'}}>
+          Drop items here to add them to the list
+        </p>
+      ) : (
+        items.map((item) => <div key={item.id}>{item.label}</div>)
+      )}
+    </div>
+  );
+}
+```
+
+## Type Safety
+
+Use TypeScript generics to type the custom data:
+
+```tsx
+interface ContainerData {
+  category: string;
+  capacity: number;
+  currentCount: number;
+}
+
+function TypedDroppable() {
+  const {ref, isDropTarget, droppable} = useDroppable<ContainerData>({
+    id: 'container-1',
+    data: {
+      category: 'electronics',
+      capacity: 50,
+      currentCount: 12,
+    },
+  });
+
+  // droppable.data is typed as ContainerData
+  return (
+    <div ref={ref}>
+      {droppable.data.category}: {droppable.data.currentCount} /{' '}
+      {droppable.data.capacity}
+    </div>
+  );
+}
+```
+
+## Related
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Context provider for drag and drop
+- [useDraggable](/api/react/use-draggable) — Make elements draggable
+- [useSortable](/api/react/use-sortable) — Combine draggable and droppable

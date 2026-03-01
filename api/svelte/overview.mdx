@@ -1,0 +1,132 @@
+---
+title: Svelte Overview
+description: Complete API reference for dnd-kit Svelte integration
+---
+
+The Svelte integration for dnd-kit provides primitives and components that enable drag and drop functionality in Svelte 5 applications using runes.
+
+## Architecture
+
+The Svelte integration is built on top of the core `@dnd-kit/dom` package and provides:
+
+- **Primitives**: Reactive functions that return state and action functions
+- **Components**: Svelte components for context and overlay management
+- **Type Safety**: Full TypeScript support with proper type inference
+- **Runes Integration**: Deep integration with Svelte 5's `$effect` and `$state`
+
+## Core Concepts
+
+### DragDropProvider
+
+The root component that provides drag and drop context to your application:
+
+```svelte
+<script>
+import { DragDropProvider } from '@dnd-kit/svelte';
+</script>
+
+<DragDropProvider>
+  <!-- Your draggable and droppable components -->
+</DragDropProvider>
+```
+
+### Primitives
+
+Svelte primitives provide reactive drag and drop functionality:
+
+- **createDraggable**: Make elements draggable
+- **createDroppable**: Make elements droppable
+- **createSortable**: Combine draggable and droppable for sortable items
+- **createDragDropMonitor**: Listen to drag and drop events
+- **createDragOperation**: Access the current drag operation state
+- **getDragDropManager**: Access the drag drop manager instance
+
+### Element Attachment
+
+Svelte primitives return `attach` functions for use with actions:
+
+```svelte
+<script>
+import { createDraggable } from '@dnd-kit/svelte';
+
+const draggable = createDraggable({
+  id: 'item-1',
+  data: { type: 'card' }
+});
+</script>
+
+<div use:draggable.attach class:dragging={draggable.isDragging}>
+  Drag me
+</div>
+```
+
+## Installation
+
+```bash
+npm install @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+```
+
+<Note>
+  Requires Svelte 5 or later for runes support.
+</Note>
+
+## Package Exports
+
+### Core
+
+- `DragDropProvider` - Context provider component
+- `DragOverlay` - Overlay component for drag preview
+- `createDraggable` - Draggable primitive
+- `createDroppable` - Droppable primitive
+- `getDragDropManager` - Manager access function
+- `createDragDropMonitor` - Event monitoring primitive
+- `createDragOperation` - Drag operation state primitive
+- `createInstance` - Instance creation primitive
+
+### Sortable
+
+- `createSortable` - Sortable item primitive
+- `isSortable` - Type guard for sortable instances
+- `isSortableOperation` - Type guard for sortable operations
+
+### Utilities
+
+- `createDeepSignal` - Deep reactivity bridge for signals
+
+### Sensors
+
+- `PointerSensor` - Mouse and touch input
+- `KeyboardSensor` - Keyboard navigation
+
+## Reactivity Model
+
+The Svelte integration uses `$effect` to sync reactive properties and `$state` to track changes:
+
+```svelte
+<script>
+import { createDraggable } from '@dnd-kit/svelte';
+
+let disabled = $state(false);
+
+const draggable = createDraggable({
+  id: 'item-1',
+  get disabled() { return disabled; }
+});
+
+// When disabled changes, the draggable automatically updates
+function toggle() {
+  disabled = !disabled;
+}
+</script>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Primitives" icon="code" href="/api/svelte/primitives">
+    Detailed reference for all Svelte primitives
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/frameworks/svelte">
+    Get started with Svelte integration
+  </Card>
+</CardGroup>

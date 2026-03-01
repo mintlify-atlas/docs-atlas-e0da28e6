@@ -1,0 +1,470 @@
+---
+title: DragDropManager
+description: The central orchestrator that manages drag and drop operations, sensors, plugins, and collision detection
+---
+
+The `DragDropManager` is the heart of dnd-kit. It coordinates all aspects of drag and drop operations, manages entities, handles collisions, and provides the API for controlling drag operations.
+
+## Overview
+
+Every drag and drop context requires a manager instance. The manager:
+
+- Maintains a registry of draggable and droppable entities
+- Coordinates sensors for input handling
+- Manages the current drag operation state
+- Computes collisions between draggables and droppables
+- Applies modifiers to transform coordinates
+- Orchestrates plugins for extended functionality
+- Emits events for monitoring drag operations
+
+## Creating a manager
+
+### Basic usage
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+
+const manager = new DragDropManager();
+```
+
+This creates a manager with the default preset:
+
+- **Sensors**: `PointerSensor`, `KeyboardSensor`
+- **Plugins**: `Accessibility`, `AutoScroller`, `Cursor`, `Feedback`, `PreventSelection`
+- **Modifiers**: None by default
+
+### Custom configuration
+
+You can customize the manager by providing configuration options:
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {PointerSensor} from '@dnd-kit/dom';
+import {RestrictToVerticalAxis} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  // Replace default sensors
+  sensors: [PointerSensor],
+  
+  // Add modifiers
+  modifiers: [RestrictToVerticalAxis],
+  
+  // Extend default plugins
+  plugins: (defaults) => [...defaults, MyCustomPlugin],
+});
+```
+
+<Note>
+Configuration options accept either a value (replaces defaults) or a function that receives defaults (allows extending).
+</Note>
+
+## Type signature
+
+```typescript
+class DragDropManager<
+  T extends Draggable,
+  U extends Droppable
+> {
+  constructor(config?: DragDropManagerInput<DragDropManager>);
+  
+  // Core properties
+  actions: DragActions<T, U>;
+  registry: DragDropRegistry<T, U>;
+  dragOperation: DragOperation<T, U>;
+  monitor: DragDropMonitor<T, U>;
+  collisionObserver: CollisionObserver<T, U>;
+  renderer: Renderer;
+  
+  // Configuration
+  sensors: Sensor[];
+  plugins: Plugin[];
+  modifiers: Modifier[];
+  
+  // Lifecycle
+  destroy(): void;
+}
+```
+
+## Configuration options
+
+### Sensors
+
+Sensors detect and handle user input:
+
+```typescript
+type Customizable<T> = T | ((defaults: T) => T);
+
+interface DragDropManagerInput {
+  sensors?: Customizable<Sensors>;
+}
+```
+
+**Replace defaults:**
+
+```typescript
+const manager = new DragDropManager({
+  sensors: [PointerSensor],
+});
+```
+
+**Extend defaults:**
+
+```typescript
+const manager = new DragDropManager({
+  sensors: (defaults) => [...defaults, MyCustomSensor],
+});
+```
+
+### Plugins
+
+Plugins extend functionality:
+
+```typescript
+interface DragDropManagerInput {
+  plugins?: Customizable<Plugins>;
+}
+```
+
+**Configure a plugin:**
+
+```typescript
+import {Feedback} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    Feedback.configure({
+      // Plugin-specific options
+      duration: 300,
+    }),
+  ],
+});
+```
+
+### Modifiers
+
+Modifiers transform drag coordinates:
+
+```typescript
+interface DragDropManagerInput {
+  modifiers?: Customizable<Modifiers>;
+}
+```
+
+```typescript
+import {RestrictToVerticalAxis, SnapToGrid} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [
+    RestrictToVerticalAxis,
+    SnapToGrid.configure({gridSize: 20}),
+  ],
+});
+```
+
+### Renderer
+
+The renderer handles visual updates:
+
+```typescript
+interface DragDropManagerInput {
+  renderer?: Renderer;
+}
+
+type Renderer = (callback: () => void) => void;
+```
+
+By default, the manager uses `requestAnimationFrame`. You can provide a custom renderer for framework integration:
+
+```typescript
+// React example
+const manager = new DragDropManager({
+  renderer: (callback) => {
+    flushSync(callback);
+  },
+});
+```
+
+## Core properties
+
+### Actions
+
+The `actions` property provides methods to control drag operations:
+
+```typescript
+manager.actions.start({source, coordinates, event});
+manager.actions.move({to, event});
+manager.actions.stop({event, canceled});
+```
+
+See the [DragDropManager API reference](/api/abstract/drag-drop-manager#dragactions) for details.
+
+### Registry
+
+The `registry` manages all draggable and droppable entities:
+
+```typescript
+// Access registered entities
+const draggables = manager.registry.draggables; // EntityRegistry<Draggable>
+const droppables = manager.registry.droppables; // EntityRegistry<Droppable>
+
+// Get entity by ID
+const draggable = manager.registry.draggables.get('item-1');
+
+// Iterate entities
+for (const draggable of manager.registry.draggables) {
+  console.log(draggable.id);
+}
+```
+
+Entities register themselves automatically when created with a manager.
+
+### Drag operation
+
+The `dragOperation` property holds the current operation state:
+
+```typescript
+const {dragOperation} = manager;
+
+// Current status
+dragOperation.status.idle      // boolean
+dragOperation.status.dragging  // boolean
+dragOperation.status.dropping  // boolean
+
+// Entities involved
+dragOperation.source           // Draggable | null
+dragOperation.target           // Droppable | null
+
+// Position and transform
+dragOperation.position.current // {x: number, y: number}
+dragOperation.position.initial // {x: number, y: number}
+dragOperation.transform        // {x: number, y: number}
+
+// Shape (bounding rectangle)
+dragOperation.shape            // {current, initial, previous} | null
+
+// Metadata
+dragOperation.activatorEvent   // Event | null
+dragOperation.canceled         // boolean
+```
+
+All properties are reactive and trigger effects when accessed inside effect contexts.
+
+### Monitor
+
+The `monitor` emits events during drag operations:
+
+```typescript
+manager.monitor.addEventListener('dragstart', (event) => {
+  console.log('Drag started:', event.operation.source);
+});
+
+manager.monitor.addEventListener('dragmove', (event) => {
+  console.log('Dragging:', event.operation.transform);
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  console.log('Drag ended:', event.operation.target);
+});
+```
+
+See the [DragDropManager API reference](/api/abstract/drag-drop-manager) for available event types.
+
+### Collision observer
+
+The `collisionObserver` computes and manages collisions:
+
+```typescript
+// Get current collisions
+const collisions = manager.collisionObserver.collisions;
+
+// Force recomputation
+manager.collisionObserver.forceUpdate();
+
+// Compute with custom parameters
+const customCollisions = manager.collisionObserver.computeCollisions(
+  specificDroppables,
+  customDetector
+);
+```
+
+See [Collision detection](/concepts/collision-detection) for details.
+
+## Customizable configuration
+
+The `Customizable<T>` type allows flexible configuration:
+
+```typescript
+type Customizable<T> = T | ((defaults: T) => T);
+
+function resolveCustomizable<T>(
+  value: Customizable<T> | undefined,
+  defaults: T
+): T;
+```
+
+### As a value (replaces defaults)
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [MyPlugin],  // Only MyPlugin, no defaults
+});
+```
+
+### As a function (receives defaults)
+
+```typescript
+const manager = new DragDropManager({
+  plugins: (defaults) => [...defaults, MyPlugin],  // Defaults + MyPlugin
+});
+```
+
+### Filtering defaults
+
+```typescript
+const manager = new DragDropManager({
+  plugins: (defaults) => defaults.filter(
+    (plugin) => plugin !== UnwantedPlugin
+  ),
+});
+```
+
+## DOM implementation
+
+The `@dnd-kit/dom` package extends the abstract manager with DOM-specific features:
+
+```typescript
+// From @dnd-kit/dom/src/core/manager/manager.ts
+export class DragDropManager extends AbstractDragDropManager {
+  constructor(input: Input = {}) {
+    const plugins = resolveCustomizable(input.plugins, defaultPreset.plugins);
+    const sensors = resolveCustomizable(input.sensors, defaultPreset.sensors);
+    const modifiers = resolveCustomizable(input.modifiers, defaultPreset.modifiers);
+
+    super({
+      ...input,
+      plugins: [ScrollListener, Scroller, StyleInjector, ...plugins],
+      sensors,
+      modifiers,
+    });
+  }
+}
+```
+
+The DOM layer automatically injects required plugins:
+
+- `ScrollListener`: Tracks scroll position changes
+- `Scroller`: Manages scroll offsets during drag
+- `StyleInjector`: Injects required CSS styles
+
+<Tip>
+These internal plugins are always included before your custom plugins, ensuring core functionality works correctly.
+</Tip>
+
+## Default preset
+
+The default configuration provides sensible defaults:
+
+```typescript
+// From @dnd-kit/dom/src/core/manager/manager.ts
+export const defaultPreset = {
+  modifiers: [],
+  plugins: [
+    Accessibility,      // Screen reader announcements
+    AutoScroller,       // Scroll containers when near edges
+    Cursor,             // Manage cursor styles
+    Feedback,           // Visual drag feedback
+    PreventSelection,   // Prevent text selection
+  ],
+  sensors: [
+    PointerSensor,      // Mouse, touch, pen input
+    KeyboardSensor,     // Keyboard navigation
+  ],
+};
+```
+
+You can reference this preset to build custom configurations:
+
+```typescript
+import {defaultPreset} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  // Keep default sensors
+  sensors: defaultPreset.sensors,
+  
+  // Customize plugins
+  plugins: (defaults) => [
+    ...defaults.filter(p => p !== AutoScroller),
+    MyCustomPlugin,
+  ],
+});
+```
+
+## Lifecycle management
+
+### Cleanup
+
+Always clean up the manager when you're done:
+
+```typescript
+const manager = new DragDropManager();
+
+// When finished
+manager.destroy();
+```
+
+The `destroy()` method:
+
+- Stops any active drag operation
+- Unregisters all entities
+- Cleans up all sensors
+- Destroys all plugins and modifiers
+- Removes event listeners
+
+### Framework integration
+
+Framework adapters handle lifecycle automatically:
+
+```tsx
+// React example
+function MyComponent() {
+  const manager = useDragDropManager();
+  // Automatically cleaned up when component unmounts
+}
+```
+
+## Type inference
+
+The manager's generic types flow through the entire system:
+
+```typescript
+type InferDraggable<P> = P extends DragDropManager<infer T, any> ? T : never;
+type InferDroppable<P> = P extends DragDropManager<any, infer T> ? T : never;
+
+// Use in plugins
+class MyPlugin<T extends DragDropManager<any, any>> extends Plugin<T> {
+  constructor(manager: T) {
+    super(manager);
+    
+    // Draggable and Droppable types are inferred from manager
+    type Draggable = InferDraggable<T>;
+    type Droppable = InferDroppable<T>;
+  }
+}
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="DragDropManager API" icon="book" href="/api/abstract/drag-drop-manager">
+    Complete API reference
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Input detection
+  </Card>
+  <Card title="Plugins" icon="puzzle-piece" href="/concepts/plugins">
+    Extend functionality
+  </Card>
+  <Card title="Collision detection" icon="eye" href="/concepts/collision-detection">
+    Detect overlaps
+  </Card>
+</CardGroup>

@@ -1,0 +1,240 @@
+---
+title: 'DragDropProvider'
+description: 'Context provider that manages drag and drop state, sensors, and event handlers'
+---
+
+`DragDropProvider` is the root component that wraps your drag and drop interface. It creates a `DragDropManager` instance, manages sensors and plugins, and provides drag and drop context to all child components.
+
+## Usage
+
+```tsx
+import {DragDropProvider} from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        console.log('Drag ended', event);
+      }}
+    >
+      {/* Your drag and drop components */}
+    </DragDropProvider>
+  );
+}
+```
+
+## Props
+
+<ParamField path="children" type="React.ReactNode" required>
+  The components that will use drag and drop functionality. Must include at least one draggable or droppable component.
+</ParamField>
+
+<ParamField path="manager" type="DragDropManager">
+  A custom `DragDropManager` instance. If not provided, a new instance is created automatically.
+</ParamField>
+
+<ParamField path="plugins" type="Plugin[]">
+  Array of plugins to customize drag and drop behavior. Plugins can modify coordinates, provide feedback, or add custom functionality.
+
+  ```tsx
+  import {Feedback} from '@dnd-kit/dom';
+
+  <DragDropProvider plugins={[new Feedback()]}>
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="modifiers" type="Modifier[]">
+  Array of modifiers that transform drag coordinates during drag operations.
+
+  ```tsx
+  import {restrictToHorizontalAxis} from '@dnd-kit/modifiers';
+
+  <DragDropProvider modifiers={[restrictToHorizontalAxis]}>
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="sensors" type="Sensor[]">
+  Array of sensors that detect drag interactions. By default, includes `PointerSensor` and `KeyboardSensor`.
+
+  ```tsx
+  import {PointerSensor} from '@dnd-kit/react';
+
+  <DragDropProvider sensors={[new PointerSensor()]}>
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+### Event Handlers
+
+<ParamField path="onBeforeDragStart" type="(event: BeforeDragStartEvent, manager: DragDropManager) => void">
+  Called before a drag operation starts. Use this to prevent or modify drag operations.
+
+  ```tsx
+  <DragDropProvider
+    onBeforeDragStart={(event, manager) => {
+      console.log('About to start dragging', event.source);
+    }}
+  >
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="onDragStart" type="(event: DragStartEvent, manager: DragDropManager) => void">
+  Called when a drag operation starts.
+
+  ```tsx
+  <DragDropProvider
+    onDragStart={(event, manager) => {
+      console.log('Drag started', event.operation.source);
+    }}
+  >
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="onDragMove" type="(event: DragMoveEvent, manager: DragDropManager) => void">
+  Called continuously while dragging. Use sparingly as this fires frequently.
+
+  ```tsx
+  <DragDropProvider
+    onDragMove={(event, manager) => {
+      console.log('Current position', event.operation.position);
+    }}
+  >
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="onDragOver" type="(event: DragOverEvent, manager: DragDropManager) => void">
+  Called when dragging over a droppable element.
+
+  ```tsx
+  <DragDropProvider
+    onDragOver={(event, manager) => {
+      console.log('Dragging over', event.operation.target);
+    }}
+  >
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="onDragEnd" type="(event: DragEndEvent, manager: DragDropManager) => void">
+  Called when a drag operation ends. This is where you typically update your application state.
+
+  ```tsx
+  <DragDropProvider
+    onDragEnd={(event, manager) => {
+      if (event.canceled) return;
+      
+      const sourceId = event.operation.source.id;
+      const targetId = event.operation.target?.id;
+      
+      // Update your state based on the drop
+      updateItems(sourceId, targetId);
+    }}
+  >
+    {children}
+  </DragDropProvider>
+  ```
+</ParamField>
+
+<ParamField path="onCollision" type="(event: CollisionEvent, manager: DragDropManager) => void">
+  Called when collision detection identifies potential drop targets.
+</ParamField>
+
+## Event Object Properties
+
+All event handlers receive an event object with the following structure:
+
+<ResponseField name="operation" type="DragOperation">
+  The current drag operation containing:
+  - `source` — The draggable element being dragged
+  - `target` — The current drop target (if any)
+  - `position` — Current position of the drag source
+  - `status` — Current status of the operation
+</ResponseField>
+
+<ResponseField name="canceled" type="boolean">
+  Whether the drag operation was canceled (only in `onDragEnd`).
+</ResponseField>
+
+## Complete Example
+
+```tsx
+import {DragDropProvider, useDraggable, useDroppable} from '@dnd-kit/react';
+import {Feedback} from '@dnd-kit/dom';
+import {useState} from 'react';
+
+function App() {
+  const [items, setItems] = useState(['A', 'B', 'C']);
+  const [activeId, setActiveId] = useState(null);
+
+  return (
+    <DragDropProvider
+      plugins={[new Feedback()]}
+      onBeforeDragStart={(event) => {
+        console.log('Starting drag:', event.source.id);
+      }}
+      onDragStart={(event) => {
+        setActiveId(event.operation.source.id);
+      }}
+      onDragOver={(event) => {
+        console.log('Over target:', event.operation.target?.id);
+      }}
+      onDragEnd={(event) => {
+        setActiveId(null);
+        
+        if (event.canceled) return;
+        
+        const {source, target} = event.operation;
+        if (target) {
+          // Handle the drop
+          console.log(`Dropped ${source.id} on ${target.id}`);
+        }
+      }}
+    >
+      <div>
+        {items.map((id) => (
+          <DraggableItem key={id} id={id} />
+        ))}
+      </div>
+      <DroppableArea id="trash" />
+    </DragDropProvider>
+  );
+}
+```
+
+## Type Parameters
+
+`DragDropProvider` accepts generic type parameters for type-safe data:
+
+```tsx
+interface MyData {
+  label: string;
+  category: string;
+}
+
+<DragDropProvider<MyData>
+  onDragEnd={(event) => {
+    // event.operation.source.data is typed as MyData
+    console.log(event.operation.source.data.label);
+  }}
+>
+  {children}
+</DragDropProvider>
+```
+
+## Related
+
+- [useDraggable](/api/react/use-draggable) — Make elements draggable
+- [useDroppable](/api/react/use-droppable) — Create drop targets
+- [useDragDropManager](/api/react/hooks#usedragdropmanager) — Access the manager instance

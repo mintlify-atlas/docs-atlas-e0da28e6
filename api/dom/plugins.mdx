@@ -1,0 +1,579 @@
+---
+title: "Plugins"
+description: "Extend drag-and-drop functionality with plugins"
+---
+
+## Overview
+
+Plugins extend the `DragDropManager` with additional functionality like accessibility, visual feedback, and auto-scrolling. The default preset includes:
+
+- **Accessibility** - Screen reader support
+- **AutoScroller** - Auto-scroll when near edges
+- **Cursor** - Cursor styling during drag
+- **Feedback** - Visual drag feedback
+- **PreventSelection** - Prevent text selection
+
+Additional plugins always included:
+- **ScrollListener** - Tracks scroll events
+- **Scroller** - Manages scrolling logic
+- **StyleInjector** - Injects plugin styles
+
+## Accessibility
+
+Provides screen reader announcements and ARIA attributes for drag-and-drop operations.
+
+### Options
+
+```typescript
+import { Accessibility } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    Accessibility.configure({
+      id: 'my-dnd',
+      announcements: {
+        dragstart: (event, manager) => `Picked up ${event.source.id}`,
+        dragover: (event, manager) => event.target ? `Over ${event.target.id}` : '',
+        dragend: (event, manager) => event.target 
+          ? `Dropped on ${event.target.id}`
+          : 'Drag cancelled'
+      },
+      screenReaderInstructions: {
+        draggable: 'Press space or enter to start dragging. Use arrow keys to move. Press space or enter to drop.'
+      },
+      debounce: 500
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="AccessibilityOptions">
+  <Expandable title="properties">
+    <ParamField path="id" type="string" optional>
+      Unique identifier for the accessibility plugin.
+      
+      Used to generate unique IDs for screen reader elements. If not provided, a unique ID is generated automatically.
+    </ParamField>
+
+    <ParamField path="idPrefix" type="{ description?: string, announcement?: string }" optional>
+      Custom prefixes for generated IDs.
+      
+      ```typescript
+      idPrefix: {
+        description: 'dnd-description',
+        announcement: 'dnd-announcement'
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="announcements" type="Announcements" optional>
+      Functions that return screen reader announcements for different events.
+      
+      ```typescript
+      announcements: {
+        dragstart: (event, manager) => string,
+        dragmove?: (event, manager) => string,
+        dragover?: (event, manager) => string,
+        dragend: (event, manager) => string
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="screenReaderInstructions" type="ScreenReaderInstructions" optional>
+      Instructions read to screen reader users.
+      
+      ```typescript
+      screenReaderInstructions: {
+        draggable: 'Press space to pick up. Use arrow keys to move...'
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="debounce" type="number" optional default="500">
+      Milliseconds to debounce announcement updates.
+      
+      Only `dragover` and `dragmove` announcements are debounced to avoid overwhelming screen readers.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Features
+
+The Accessibility plugin automatically:
+
+- Adds `role="button"` to draggable elements (if not already a button)
+- Adds `aria-roledescription="draggable"` attribute
+- Adds `aria-describedby` pointing to instructions
+- Sets `aria-pressed` / `aria-grabbed` to indicate drag state
+- Sets `aria-disabled` based on draggable state
+- Ensures elements are focusable with `tabindex="0"`
+- Creates a live region for screen reader announcements
+
+## AutoScroller
+
+Automatically scrolls containers when dragging near their edges.
+
+### Options
+
+```typescript
+import { AutoScroller } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    AutoScroller.configure({
+      acceleration: 25,
+      threshold: 0.2
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="AutoScrollerOptions">
+  <Expandable title="properties">
+    <ParamField path="acceleration" type="number" optional default="25">
+      Base scroll speed multiplier. Higher values scroll faster.
+      
+      The actual scroll speed is calculated based on how close the pointer is to the edge:
+      - At the threshold boundary: slower
+      - At the very edge: `acceleration` pixels per interval
+    </ParamField>
+
+    <ParamField path="threshold" type="number | { x: number, y: number }" optional default="0.2">
+      Percentage of container dimensions that defines the scroll activation zone.
+      
+      - `0.2` = 20% of the container (near edges)
+      - Set an axis to `0` to disable scrolling on that axis
+      
+      ```typescript
+      // 20% on both axes
+      threshold: 0.2
+      
+      // Different per axis
+      threshold: { x: 0.15, y: 0.25 }
+      
+      // Only vertical scrolling
+      threshold: { x: 0, y: 0.2 }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Behavior
+
+- Automatically detects scrollable containers
+- Scrolls when the dragged element is within the threshold zone
+- Scroll speed increases as you get closer to the edge
+- Works with nested scrollable containers
+- Automatically disabled during keyboard dragging
+
+## Cursor
+
+Changes the cursor style during drag operations.
+
+### Options
+
+```typescript
+import { Cursor } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    Cursor.configure({
+      cursor: 'grabbing' // or 'move', 'grab', etc.
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="CursorOptions">
+  <Expandable title="properties">
+    <ParamField path="cursor" type="string" optional default="grabbing">
+      CSS cursor value to apply during drag.
+      
+      Common values:
+      - `'grabbing'` (default)
+      - `'move'`
+      - `'grab'`
+      - `'pointer'`
+      - Any valid CSS cursor value
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Example
+
+```typescript
+// Use 'move' cursor
+Cursor.configure({ cursor: 'move' })
+
+// Use custom cursor
+Cursor.configure({ cursor: 'url(custom-cursor.png), auto' })
+```
+
+## Feedback
+
+Provides visual feedback during drag operations with drag overlays and drop animations.
+
+### Options
+
+```typescript
+import { Feedback } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    Feedback.configure({
+      feedback: 'default',
+      rootElement: document.body,
+      dropAnimation: { duration: 250, easing: 'ease' },
+      keyboardTransition: { duration: 250, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="FeedbackOptions">
+  <Expandable title="properties">
+    <ParamField path="feedback" type="FeedbackType" optional default="default">
+      Type of visual feedback:
+      
+      - `'default'` - Element stays in place, overlay follows cursor
+      - `'move'` - Element itself moves (no placeholder)
+      - `'clone'` - Element stays visible, clone follows cursor
+      - `'none'` - No visual feedback
+    </ParamField>
+
+    <ParamField path="rootElement" type="Element | Function" optional>
+      Container for the dragged element.
+      
+      Can be an element or a function that returns an element based on the source:
+      
+      ```typescript
+      rootElement(source) {
+        return source.element.closest('.container');
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="dropAnimation" type="DropAnimation | null" optional>
+      Configuration for the drop animation.
+      
+      ```typescript
+      // Options object
+      dropAnimation: {
+        duration: 250,  // Milliseconds
+        easing: 'ease'  // CSS easing function
+      }
+      
+      // Custom function
+      dropAnimation: async ({ element, translate, moved }) => {
+        // Custom animation logic
+      }
+      
+      // Disable
+      dropAnimation: null
+      ```
+    </ParamField>
+
+    <ParamField path="keyboardTransition" type="KeyboardTransition | null" optional>
+      Transition configuration for keyboard dragging.
+      
+      ```typescript
+      keyboardTransition: {
+        duration: 250,                            // Milliseconds
+        easing: 'cubic-bezier(0.25, 1, 0.5, 1)' // CSS easing
+      }
+      
+      // Disable smooth keyboard movement
+      keyboardTransition: null
+      ```
+      
+      Set to `null` to disable smooth transitions during keyboard dragging (instant movement).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Feedback Types
+
+#### Default Feedback
+
+```typescript
+feedback: 'default'
+```
+
+- Original element hidden with placeholder
+- Element follows cursor
+- Smooth drop animation back to final position
+
+#### Move Feedback
+
+```typescript
+feedback: 'move'
+```
+
+- Element itself moves (no clone)
+- No placeholder left behind
+- Good for simple reordering
+
+#### Clone Feedback
+
+```typescript
+feedback: 'clone'
+```
+
+- Original element stays visible
+- Clone follows cursor
+- Good for copy operations or when source stays visible
+
+#### No Feedback
+
+```typescript
+feedback: 'none'
+```
+
+- No visual feedback
+- Useful for custom implementations
+
+### Drop Animation
+
+Customize the animation when dropping:
+
+```typescript
+// Simple options
+Feedback.configure({
+  dropAnimation: {
+    duration: 200,
+    easing: 'ease-out'
+  }
+});
+
+// Custom function
+Feedback.configure({
+  dropAnimation: async ({ element, feedbackElement, translate, moved }) => {
+    // Implement custom animation
+    element.style.transition = 'transform 0.3s ease';
+    element.style.transform = 'scale(0.8)';
+    
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    element.style.transform = '';
+  }
+});
+
+// Disable drop animation
+Feedback.configure({
+  dropAnimation: null
+});
+```
+
+### Per-Entity Configuration
+
+Feedback can be configured per draggable:
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    element: document.getElementById('item-1'),
+    plugins: [
+      Feedback.configure({
+        feedback: 'clone',
+        dropAnimation: { duration: 150 }
+      })
+    ]
+  },
+  manager
+);
+```
+
+## PreventSelection
+
+Prevents text selection during drag operations.
+
+### Usage
+
+```typescript
+import { PreventSelection } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    PreventSelection
+  ]
+});
+```
+
+No configuration options. Automatically:
+- Applies `user-select: none` during drag
+- Removes any existing text selection
+- Listens for selection changes and clears them
+
+## Scroller
+
+Core scrolling logic used by AutoScroller. Generally used internally.
+
+### Usage
+
+```typescript
+import { Scroller } from '@dnd-kit/dom';
+
+// Included automatically, but can be configured
+const manager = new DragDropManager({
+  plugins: [Scroller]
+});
+```
+
+## ScrollListener
+
+Tracks scroll events for collision detection updates. Always included automatically.
+
+### Usage
+
+```typescript
+import { ScrollListener } from '@dnd-kit/dom';
+
+// Included automatically
+const manager = new DragDropManager({
+  plugins: [ScrollListener]
+});
+```
+
+## StyleInjector
+
+Injects CSS for plugins into the document. Always included automatically.
+
+### Usage
+
+```typescript
+import { StyleInjector } from '@dnd-kit/dom';
+
+// Included automatically
+const manager = new DragDropManager({
+  plugins: [StyleInjector]
+});
+```
+
+## Example: Custom Plugin Configuration
+
+```typescript
+import {
+  DragDropManager,
+  Accessibility,
+  AutoScroller,
+  Cursor,
+  Feedback
+} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [
+    // Custom accessibility announcements
+    Accessibility.configure({
+      announcements: {
+        dragstart: (event) => `Started dragging ${event.source.id}`,
+        dragover: (event) => {
+          if (event.target) {
+            return `Over drop zone ${event.target.id}`;
+          }
+          return 'Not over a drop zone';
+        },
+        dragend: (event) => {
+          if (event.canceled) return 'Drag cancelled';
+          if (event.target) return `Dropped on ${event.target.id}`;
+          return 'Dropped';
+        }
+      },
+      debounce: 300
+    }),
+    
+    // Faster auto-scroll
+    AutoScroller.configure({
+      acceleration: 40,
+      threshold: { x: 0.15, y: 0.2 }
+    }),
+    
+    // Custom cursor
+    Cursor.configure({
+      cursor: 'move'
+    }),
+    
+    // Clone feedback with custom drop animation
+    Feedback.configure({
+      feedback: 'clone',
+      dropAnimation: {
+        duration: 200,
+        easing: 'ease-out'
+      },
+      keyboardTransition: {
+        duration: 200,
+        easing: 'ease'
+      }
+    })
+  ]
+});
+```
+
+## Example: Minimal Setup
+
+```typescript
+import { DragDropManager, Feedback } from '@dnd-kit/dom';
+
+// Only Feedback, no other plugins
+const manager = new DragDropManager({
+  plugins: [Feedback]
+});
+```
+
+## Type Definitions
+
+```typescript
+interface AccessibilityOptions {
+  id?: string;
+  idPrefix?: {
+    description?: string;
+    announcement?: string;
+  };
+  announcements?: Announcements;
+  screenReaderInstructions?: ScreenReaderInstructions;
+  debounce?: number;
+}
+
+interface AutoScrollerOptions {
+  acceleration?: number;
+  threshold?: number | Record<'x' | 'y', number>;
+}
+
+interface CursorOptions {
+  cursor?: string;
+}
+
+interface FeedbackOptions {
+  feedback?: 'default' | 'move' | 'clone' | 'none';
+  rootElement?: Element | ((source: Draggable) => Element);
+  dropAnimation?: DropAnimation | null;
+  keyboardTransition?: KeyboardTransition | null;
+}
+
+type DropAnimation = DropAnimationOptions | DropAnimationFunction;
+
+interface DropAnimationOptions {
+  duration?: number;
+  easing?: string;
+}
+
+type DropAnimationFunction = (context: {
+  source: Draggable;
+  element: Element;
+  feedbackElement: Element;
+  placeholder: Element | null;
+  translate: Coordinates;
+  moved: boolean;
+}) => Promise<void> | void;
+
+interface KeyboardTransition {
+  duration?: number;
+  easing?: string;
+}
+```
+
+## Related
+
+- [DragDropManager](/api/dom/drag-drop-manager) - Configure the manager
+- [Sensors](/api/dom/sensors) - Input handling
+- [Sortable](/api/dom/sortable) - High-level API

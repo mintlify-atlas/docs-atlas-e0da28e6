@@ -1,0 +1,443 @@
+---
+title: Solid Hooks
+description: Complete API reference for dnd-kit Solid hooks
+---
+
+## useDraggable
+
+Make an element draggable.
+
+### Usage
+
+```tsx
+import { useDraggable } from '@dnd-kit/solid';
+
+function DraggableCard() {
+  const { draggable, isDragging, ref, handleRef } = useDraggable({
+    id: 'card-1',
+    data: { type: 'card' }
+  });
+
+  return (
+    <div ref={ref} classList={{ dragging: isDragging() }}>
+      <div ref={handleRef} class="handle">⋮⋮</div>
+      <div class="content">Drag me</div>
+    </div>
+  );
+}
+```
+
+### Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for the draggable element. Can be a getter for reactivity.
+</ParamField>
+
+<ParamField path="element" type="Element">
+  Initial element to make draggable (usually set via the `ref` return value)
+</ParamField>
+
+<ParamField path="handle" type="Element">
+  Initial drag handle element (usually set via the `handleRef` return value)
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to the draggable instance
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Whether the draggable is disabled
+</ParamField>
+
+<ParamField path="alignment" type="Alignment">
+  Alignment configuration for the draggable element
+</ParamField>
+
+<ParamField path="plugins" type="Plugin[]">
+  Array of plugins to apply to this draggable
+</ParamField>
+
+<ParamField path="modifiers" type="Modifier[]">
+  Array of modifiers to transform drag coordinates
+</ParamField>
+
+<ParamField path="sensors" type="Sensor[]">
+  Custom sensors for this draggable instance
+</ParamField>
+
+### Returns
+
+<ResponseField name="draggable" type="Draggable">
+  The draggable instance
+</ResponseField>
+
+<ResponseField name="isDragging" type="Accessor<boolean>">
+  Signal indicating whether this element is currently being dragged
+</ResponseField>
+
+<ResponseField name="isDropping" type="Accessor<boolean>">
+  Signal indicating whether this element is currently dropping
+</ResponseField>
+
+<ResponseField name="isDragSource" type="Accessor<boolean>">
+  Signal indicating whether this element is the source of the current drag operation
+</ResponseField>
+
+<ResponseField name="ref" type="(el: Element) => void">
+  Ref setter to attach the draggable behavior to an element
+</ResponseField>
+
+<ResponseField name="handleRef" type="(el: Element) => void">
+  Ref setter to attach a drag handle to an element
+</ResponseField>
+
+---
+
+## useDroppable
+
+Make an element droppable.
+
+### Usage
+
+```tsx
+import { useDroppable } from '@dnd-kit/solid';
+
+function DropZone() {
+  const { droppable, isDropTarget, ref } = useDroppable({
+    id: 'zone-1',
+    accept: ['card']
+  });
+
+  return (
+    <div ref={ref} classList={{ 'drop-target': isDropTarget() }}>
+      Drop here
+    </div>
+  );
+}
+```
+
+### Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for the droppable element. Can be a getter for reactivity.
+</ParamField>
+
+<ParamField path="element" type="Element">
+  Initial element to make droppable (usually set via the `ref` return value)
+</ParamField>
+
+<ParamField path="accept" type="string[]">
+  Array of draggable types this droppable accepts
+</ParamField>
+
+<ParamField path="type" type="string">
+  Type identifier for this droppable
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Whether the droppable is disabled
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to the droppable instance
+</ParamField>
+
+<ParamField path="collisionDetector" type="CollisionDetector">
+  Custom collision detection algorithm
+</ParamField>
+
+### Returns
+
+<ResponseField name="droppable" type="Droppable">
+  The droppable instance
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="Accessor<boolean>">
+  Signal indicating whether this element is currently a valid drop target
+</ResponseField>
+
+<ResponseField name="ref" type="(el: Element) => void">
+  Ref setter to attach the droppable behavior to an element
+</ResponseField>
+
+---
+
+## useSortable
+
+Combine draggable and droppable functionality for sortable items.
+
+### Usage
+
+```tsx
+import { For } from 'solid-js';
+import { useSortable } from '@dnd-kit/solid/sortable';
+
+function SortableList() {
+  const [items, setItems] = createSignal([
+    { id: 1, text: 'Item 1' },
+    { id: 2, text: 'Item 2' },
+    { id: 3, text: 'Item 3' }
+  ]);
+
+  return (
+    <For each={items()}>
+      {(item, index) => {
+        const { sortable, isDragging, isDropTarget, ref } = useSortable({
+          id: item.id,
+          group: 'list',
+          get index() { return index(); }
+        });
+
+        return (
+          <div 
+            ref={ref}
+            classList={{
+              dragging: isDragging(),
+              'drop-target': isDropTarget()
+            }}
+          >
+            {item.text}
+          </div>
+        );
+      }}
+    </For>
+  );
+}
+```
+
+### Parameters
+
+Includes all parameters from `useDraggable` and `useDroppable`, plus:
+
+<ParamField path="group" type="string | number" required>
+  The sortable group this item belongs to. Can be a getter for reactivity.
+</ParamField>
+
+<ParamField path="index" type="number" required>
+  The current index of this item in the sortable group. Should be a getter for reactivity.
+</ParamField>
+
+<ParamField path="source" type="Element">
+  Optional source element for the sortable
+</ParamField>
+
+<ParamField path="target" type="Element">
+  Optional target element for drop positioning
+</ParamField>
+
+<ParamField path="transition" type="Transition">
+  Transition configuration for sortable animations
+</ParamField>
+
+<ParamField path="collisionPriority" type="number">
+  Priority for collision detection when multiple droppables overlap
+</ParamField>
+
+### Returns
+
+<ResponseField name="sortable" type="Sortable">
+  The sortable instance
+</ResponseField>
+
+<ResponseField name="isDragging" type="Accessor<boolean>">
+  Signal indicating whether this element is currently being dragged
+</ResponseField>
+
+<ResponseField name="isDropping" type="Accessor<boolean>">
+  Signal indicating whether this element is currently dropping
+</ResponseField>
+
+<ResponseField name="isDragSource" type="Accessor<boolean>">
+  Signal indicating whether this element is the source of the current drag operation
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="Accessor<boolean>">
+  Signal indicating whether this element is currently a valid drop target
+</ResponseField>
+
+<ResponseField name="ref" type="(el: Element) => void">
+  Ref setter to attach the sortable behavior to an element
+</ResponseField>
+
+<ResponseField name="handleRef" type="(el: Element) => void">
+  Ref setter to attach a drag handle
+</ResponseField>
+
+<ResponseField name="sourceRef" type="(el: Element) => void">
+  Ref setter to attach a source element
+</ResponseField>
+
+<ResponseField name="targetRef" type="(el: Element) => void">
+  Ref setter to attach a target element for drop positioning
+</ResponseField>
+
+---
+
+## useDragDropMonitor
+
+Listen to drag and drop events.
+
+### Usage
+
+```tsx
+import { useDragDropMonitor } from '@dnd-kit/solid';
+
+function App() {
+  useDragDropMonitor({
+    onDragStart(event) {
+      console.log('Drag started:', event.operation.source);
+    },
+    onDragMove(event) {
+      console.log('Dragging:', event.operation.shape.current);
+    },
+    onDragEnd(event) {
+      console.log('Drag ended:', event.operation);
+    },
+    onBeforeDragStart(event) {
+      if (shouldCancel) {
+        event.preventDefault();
+      }
+    }
+  });
+
+  return (
+    <DragDropProvider>
+      {/* ... */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Parameters
+
+<ParamField path="onBeforeDragStart" type="(event: BeforeDragStartEvent) => void">
+  Called before drag starts. Can cancel the operation.
+</ParamField>
+
+<ParamField path="onDragStart" type="(event: DragStartEvent) => void">
+  Called when drag operation starts
+</ParamField>
+
+<ParamField path="onDragMove" type="(event: DragMoveEvent) => void">
+  Called when the dragged element moves
+</ParamField>
+
+<ParamField path="onDragOver" type="(event: DragOverEvent) => void">
+  Called when dragging over a droppable
+</ParamField>
+
+<ParamField path="onDragEnd" type="(event: DragEndEvent) => void">
+  Called when drag operation ends
+</ParamField>
+
+<ParamField path="onDragCancel" type="(event: DragCancelEvent) => void">
+  Called when drag operation is cancelled
+</ParamField>
+
+---
+
+## useDragOperation
+
+Access the current drag operation state.
+
+### Usage
+
+```tsx
+import { useDragOperation } from '@dnd-kit/solid';
+import { Show } from 'solid-js';
+
+function DragStatus() {
+  const { source, target, status } = useDragOperation();
+
+  return (
+    <>
+      <Show when={source()}>
+        <div>Currently dragging: {source()?.id}</div>
+      </Show>
+      <Show when={target()}>
+        <div>Over: {target()?.id}</div>
+      </Show>
+      <div>
+        Status: {status()?.idle ? 'idle' : 'active'}
+      </div>
+    </>
+  );
+}
+```
+
+### Returns
+
+<ResponseField name="source" type="Accessor<Draggable | null>">
+  Signal for the source draggable element of the current operation
+</ResponseField>
+
+<ResponseField name="target" type="Accessor<Droppable | null>">
+  Signal for the current drop target
+</ResponseField>
+
+<ResponseField name="status" type="Accessor<DragOperationStatus | undefined>">
+  Signal for the status of the drag operation (idle, dragging, dropping)
+</ResponseField>
+
+---
+
+## useDragDropManager
+
+Access the drag drop manager instance.
+
+### Usage
+
+```tsx
+import { useDragDropManager } from '@dnd-kit/solid';
+
+function ManagerInfo() {
+  const manager = useDragDropManager();
+
+  // Access manager properties
+  const draggables = manager?.registry.draggables;
+  const droppables = manager?.registry.droppables;
+
+  return <div>Manager loaded: {manager ? 'yes' : 'no'}</div>;
+}
+```
+
+### Returns
+
+<ResponseField name="manager" type="DragDropManager | undefined">
+  The drag drop manager instance (undefined if called outside DragDropProvider)
+</ResponseField>
+
+---
+
+## useDeepSignal
+
+Create a deep reactive proxy for signal-based objects.
+
+### Usage
+
+```tsx
+import { useDeepSignal } from '@dnd-kit/solid/hooks';
+import { useDragDropManager } from '@dnd-kit/solid';
+
+function Component() {
+  const manager = useDragDropManager();
+  const tracked = useDeepSignal(() => manager?.dragOperation);
+
+  // Accessing nested signal properties triggers reactivity
+  const sourceId = tracked()?.source?.id;
+
+  return <div>Source: {sourceId}</div>;
+}
+```
+
+### Parameters
+
+<ParamField path="target" type="Accessor<T>" required>
+  An accessor that returns the target object to track (typically contains signals)
+</ParamField>
+
+### Returns
+
+<ResponseField name="proxy" type="Accessor<T>">
+  An accessor that proxies access to the target and triggers reactivity on nested signal reads
+</ResponseField>

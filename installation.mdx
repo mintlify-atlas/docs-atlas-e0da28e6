@@ -1,0 +1,462 @@
+---
+title: Installation
+description: Install dnd-kit packages for your preferred framework and package manager
+---
+
+## Choose your framework
+
+dnd-kit provides framework-specific adapters for React, Vue, Svelte, SolidJS, and vanilla JavaScript. Choose the installation instructions for your framework:
+
+<Tabs>
+  <Tab title="React">
+    Install the React adapter along with its peer dependencies.
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install @dnd-kit/react @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash yarn
+    yarn add @dnd-kit/react @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash pnpm
+    pnpm add @dnd-kit/react @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash bun
+    bun add @dnd-kit/react @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    </CodeGroup>
+
+    ### Peer dependencies
+
+    The React adapter requires React 18.0.0 or higher:
+
+    ```json package.json
+    {
+      "dependencies": {
+        "react": "^18.0.0 || ^19.0.0",
+        "react-dom": "^18.0.0 || ^19.0.0"
+      }
+    }
+    ```
+
+    <Info>
+      dnd-kit is compatible with both React 18 and the latest React 19.
+    </Info>
+  </Tab>
+
+  <Tab title="Vue">
+    Install the Vue adapter along with its dependencies.
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash yarn
+    yarn add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash pnpm
+    pnpm add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash bun
+    bun add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    </CodeGroup>
+  </Tab>
+
+  <Tab title="Svelte">
+    Install the Svelte adapter along with its dependencies.
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash yarn
+    yarn add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash pnpm
+    pnpm add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash bun
+    bun add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    </CodeGroup>
+  </Tab>
+
+  <Tab title="SolidJS">
+    Install the SolidJS adapter along with its dependencies.
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash yarn
+    yarn add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash pnpm
+    pnpm add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash bun
+    bun add @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    </CodeGroup>
+  </Tab>
+
+  <Tab title="Vanilla JS">
+    Install the core DOM package for framework-agnostic usage.
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash yarn
+    yarn add @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash pnpm
+    pnpm add @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    ```bash bun
+    bun add @dnd-kit/dom @dnd-kit/abstract
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Optional packages
+
+Depending on your use case, you may want to install additional packages:
+
+### Sortable
+
+If you're building sortable lists, the sortable functionality is included in the framework adapters:
+
+<CodeGroup>
+
+```tsx React
+import {useSortable} from '@dnd-kit/react/sortable';
+```
+
+```vue Vue
+import {useSortable} from '@dnd-kit/vue/sortable';
+```
+
+```svelte Svelte
+import {sortable} from '@dnd-kit/svelte/sortable';
+```
+
+</CodeGroup>
+
+<Note>
+  The sortable module is included in the framework adapters—no additional installation required.
+</Note>
+
+### Collision detection
+
+Advanced collision detection algorithms are available in the `@dnd-kit/collision` package:
+
+<CodeGroup>
+
+```bash npm
+npm install @dnd-kit/collision
+```
+
+```bash yarn
+yarn add @dnd-kit/collision
+```
+
+```bash pnpm
+pnpm add @dnd-kit/collision
+```
+
+```bash bun
+bun add @dnd-kit/collision
+```
+
+</CodeGroup>
+
+This package provides algorithms like:
+
+- `closestCenter` - Finds the droppable closest to the center of the draggable
+- `closestCorners` - Measures distance to all four corners
+- `rectangleIntersection` - Detects overlapping rectangles
+- `directionBiased` - Optimized for sortable lists
+
+### Helpers
+
+Utility functions for common operations:
+
+<CodeGroup>
+
+```bash npm
+npm install @dnd-kit/helpers
+```
+
+```bash yarn
+yarn add @dnd-kit/helpers
+```
+
+```bash pnpm
+pnpm add @dnd-kit/helpers
+```
+
+```bash bun
+bun add @dnd-kit/helpers
+```
+
+</CodeGroup>
+
+Provides helpers like `move()` for reordering arrays:
+
+```tsx
+import {move} from '@dnd-kit/helpers';
+
+const newItems = move(items, dragEvent);
+```
+
+### Geometry
+
+Geometry utilities for calculating positions and distances:
+
+<CodeGroup>
+
+```bash npm
+npm install @dnd-kit/geometry
+```
+
+```bash yarn
+yarn add @dnd-kit/geometry
+```
+
+```bash pnpm
+pnpm add @dnd-kit/geometry
+```
+
+```bash bun
+bun add @dnd-kit/geometry
+```
+
+</CodeGroup>
+
+## Package exports
+
+Each framework adapter provides multiple entry points for tree-shaking optimization:
+
+<Tabs>
+  <Tab title="React">
+    The React package exports are organized by feature:
+
+    ```tsx
+    // Core drag and drop
+    import {
+      DragDropProvider,
+      useDraggable,
+      useDroppable,
+      DragOverlay,
+      useDragDropManager,
+      useDragDropMonitor,
+    } from '@dnd-kit/react';
+
+    // Sortable
+    import {useSortable} from '@dnd-kit/react/sortable';
+
+    // Utilities
+    import {currentValue} from '@dnd-kit/react/utilities';
+
+    // React-specific hooks
+    import {
+      useComputed,
+      useConstant,
+      useLatest,
+    } from '@dnd-kit/react/hooks';
+    ```
+
+    All exports are available in both ESM and CommonJS formats:
+
+    ```json package.json
+    {
+      "exports": {
+        ".": {
+          "types": "./index.d.ts",
+          "import": "./index.js",
+          "require": "./index.cjs"
+        },
+        "./sortable": {
+          "types": "./sortable.d.ts",
+          "import": "./sortable.js",
+          "require": "./sortable.cjs"
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="DOM">
+    The DOM package provides the core implementation:
+
+    ```tsx
+    import {
+      DragDropManager,
+      Draggable,
+      Droppable,
+      PointerSensor,
+      KeyboardSensor,
+    } from '@dnd-kit/dom';
+
+    // Sortable utilities
+    import {Sortable} from '@dnd-kit/dom/sortable';
+
+    // Plugins
+    import {Debug} from '@dnd-kit/dom/plugins/debug';
+    import {Feedback} from '@dnd-kit/dom/plugins/feedback';
+    ```
+  </Tab>
+</Tabs>
+
+## TypeScript support
+
+All dnd-kit packages are written in TypeScript and include type definitions:
+
+```tsx
+import type {
+  UseDraggableInput,
+  UseDroppableInput,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+} from '@dnd-kit/react';
+
+function handleDragEnd(event: DragEndEvent) {
+  const {source, target} = event.operation;
+  // TypeScript knows the shape of event
+}
+```
+
+<Check>
+  No additional `@types` packages needed—types are included in each package.
+</Check>
+
+## Version compatibility
+
+All dnd-kit packages follow semantic versioning. When installing multiple packages, ensure they're on compatible versions:
+
+```json package.json
+{
+  "dependencies": {
+    "@dnd-kit/react": "^0.3.2",
+    "@dnd-kit/dom": "^0.3.2",
+    "@dnd-kit/abstract": "^0.3.2",
+    "@dnd-kit/collision": "^0.3.2",
+    "@dnd-kit/helpers": "^0.3.2"
+  }
+}
+```
+
+<Warning>
+  Always use the same minor version across all `@dnd-kit` packages to avoid compatibility issues.
+</Warning>
+
+## Bundler configuration
+
+### Next.js
+
+dnd-kit works seamlessly with Next.js 13+ and the App Router. All components are marked with `'use client'` where needed:
+
+```tsx app/page.tsx
+'use client';
+
+import {DragDropProvider, useDraggable} from '@dnd-kit/react';
+
+export default function Page() {
+  return (
+    <DragDropProvider>
+      {/* Your drag and drop interface */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Vite
+
+No special configuration needed for Vite. The library works out of the box:
+
+```tsx
+import {DragDropProvider} from '@dnd-kit/react';
+
+function App() {
+  return <DragDropProvider>{/* ... */}</DragDropProvider>;
+}
+```
+
+### Webpack
+
+For Webpack 5, ensure you're using the latest version. No additional configuration required.
+
+## Verify installation
+
+Create a simple test to verify your installation:
+
+<CodeGroup>
+
+```tsx React
+import {DragDropProvider} from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider>
+      <div>dnd-kit installed successfully!</div>
+    </DragDropProvider>
+  );
+}
+
+export default App;
+```
+
+```vue Vue
+<script setup>
+import {DragDropProvider} from '@dnd-kit/vue';
+</script>
+
+<template>
+  <DragDropProvider>
+    <div>dnd-kit installed successfully!</div>
+  </DragDropProvider>
+</template>
+```
+
+</CodeGroup>
+
+If this renders without errors, you're ready to go!
+
+## Next steps
+
+<Card
+  title="Quick start guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Build your first drag and drop interface with our step-by-step guide
+</Card>

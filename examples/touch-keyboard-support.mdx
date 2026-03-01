@@ -1,0 +1,439 @@
+---
+title: Touch and Keyboard Support
+description: Advanced examples for implementing comprehensive touch and keyboard controls for drag and drop interfaces
+---
+
+# Touch and Keyboard Support
+
+The dnd-kit library provides robust sensor implementations for pointer (mouse/touch/pen) and keyboard interactions. This guide shows you how to configure and customize these sensors for optimal user experience across all input methods.
+
+## Understanding Sensors
+
+Sensors detect and initiate drag operations. dnd-kit includes two primary sensors:
+
+- **PointerSensor**: Handles mouse, touch, and pen interactions
+- **KeyboardSensor**: Handles keyboard-based dragging
+
+## Basic Sensor Setup
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+import {DragDropManager} from '@dnd-kit/dom';
+import {PointerSensor, KeyboardSensor} from '@dnd-kit/dom/sensors';
+
+const manager = new DragDropManager({
+  sensors: [PointerSensor, KeyboardSensor],
+});
+```
+
+## PointerSensor Configuration
+
+The PointerSensor handles mouse, touch, and pen inputs with intelligent activation constraints.
+
+### Default Activation Constraints
+
+By default, the PointerSensor uses different activation constraints based on input type:
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+// Mouse on drag handle: Immediate activation
+// Touch: 250ms delay with 5px tolerance
+// Text inputs: 200ms delay with 0px tolerance  
+// Other pen/mouse: 200ms delay with 10px tolerance, or 5px distance
+```
+
+### Custom Activation Constraints
+
+Configure activation constraints globally:
+
+```typescript
+import {PointerSensor, PointerActivationConstraints} from '@dnd-kit/dom/sensors';
+
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints: [
+        // Require 300ms hold
+        new PointerActivationConstraints.Delay({value: 300, tolerance: 5}),
+        // OR 10px movement
+        new PointerActivationConstraints.Distance({value: 10}),
+      ],
+    }),
+  ],
+});
+```
+
+### Per-Draggable Activation Constraints
+
+Set different constraints for individual draggables:
+
+```typescript
+import {PointerSensor, PointerActivationConstraints} from '@dnd-kit/dom/sensors';
+
+// Immediate activation for some items
+const quickDraggable = manager.registry.draggables.register(element1, {
+  ...PointerSensor.configure({
+    activationConstraints: undefined, // No constraints
+  }),
+});
+
+// Longer delay for others
+const delayedDraggable = manager.registry.draggables.register(element2, {
+  ...PointerSensor.configure({
+    activationConstraints: [
+      new PointerActivationConstraints.Delay({value: 500, tolerance: 8}),
+    ],
+  }),
+});
+```
+
+### Dynamic Activation Constraints
+
+Use a function to determine constraints based on the event:
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints: (event, source) => {
+        // Immediate activation for mouse on handles
+        if (event.pointerType === 'mouse' && source.handle?.contains(event.target)) {
+          return undefined;
+        }
+        
+        // Longer delay for touch
+        if (event.pointerType === 'touch') {
+          return [
+            new PointerActivationConstraints.Delay({value: 400, tolerance: 5}),
+          ];
+        }
+        
+        // Distance-based for pen
+        if (event.pointerType === 'pen') {
+          return [
+            new PointerActivationConstraints.Distance({value: 8}),
+          ];
+        }
+        
+        return [
+          new PointerActivationConstraints.Delay({value: 200, tolerance: 10}),
+        ];
+      },
+    }),
+  ],
+});
+```
+
+## Touch-Specific Optimizations
+
+### Preventing Scroll During Touch Drag
+
+The PointerSensor automatically prevents scrolling during touch drag operations:
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+// Automatically handled by the sensor:
+// - Prevents touchmove during active drag
+// - Uses pointer capture to maintain control
+// - Cancels native drag events
+```
+
+### Touch Delay Tolerance
+
+The tolerance parameter allows small movements before canceling activation:
+
+```typescript
+// Allow 5px of movement during the 250ms delay
+new PointerActivationConstraints.Delay({value: 250, tolerance: 5})
+```
+
+## Preventing Unwanted Activation
+
+Prevent activation on specific elements:
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      preventActivation: (event, source) => {
+        // Don't activate on buttons inside draggable
+        if (event.target.tagName === 'BUTTON') {
+          return true;
+        }
+        
+        // Don't activate on links
+        if (event.target.closest('a')) {
+          return true;
+        }
+        
+        // Don't activate on form controls
+        if (event.target.matches('input, select, textarea')) {
+          return true;
+        }
+        
+        return false;
+      },
+    }),
+  ],
+});
+```
+
+## KeyboardSensor Configuration
+
+The KeyboardSensor enables full keyboard accessibility.
+
+### Default Keyboard Controls
+
+```typescript packages/dom/src/core/sensors/keyboard/KeyboardSensor.ts
+// Start drag: Space or Enter
+// Move up: ArrowUp
+// Move down: ArrowDown  
+// Move left: ArrowLeft
+// Move right: ArrowRight
+// Drop: Space or Enter
+// Cancel: Escape
+```
+
+### Custom Keyboard Codes
+
+```typescript
+import {KeyboardSensor} from '@dnd-kit/dom/sensors';
+
+const manager = new DragDropManager({
+  sensors: [
+    KeyboardSensor.configure({
+      keyboardCodes: {
+        start: ['Space', 'Enter'],
+        cancel: ['Escape'],
+        end: ['Space', 'Enter'],
+        up: ['ArrowUp', 'KeyW'],
+        down: ['ArrowDown', 'KeyS'],
+        left: ['ArrowLeft', 'KeyA'],
+        right: ['ArrowRight', 'KeyD'],
+      },
+    }),
+  ],
+});
+```
+
+### Custom Movement Offset
+
+Control how far items move with each keypress:
+
+```typescript packages/dom/src/core/sensors/keyboard/KeyboardSensor.ts
+const manager = new DragDropManager({
+  sensors: [
+    KeyboardSensor.configure({
+      offset: 25, // Move 25px per keypress
+    }),
+  ],
+});
+
+// Different offsets for x and y
+const manager2 = new DragDropManager({
+  sensors: [
+    KeyboardSensor.configure({
+      offset: {x: 50, y: 25},
+    }),
+  ],
+});
+```
+
+### Shift Key Multiplier
+
+The KeyboardSensor automatically multiplies movement by 5 when Shift is held:
+
+```typescript packages/dom/src/core/sensors/keyboard/KeyboardSensor.ts
+// Normal: 10px per arrow key
+// With Shift: 50px per arrow key
+```
+
+## Multiple Activator Elements
+
+Use multiple elements to activate dragging:
+
+```typescript packages/dom/src/core/sensors/pointer/PointerSensor.ts
+const card = document.querySelector('.card');
+const handle1 = card.querySelector('.handle-1');
+const handle2 = card.querySelector('.handle-2');
+
+const draggable = manager.registry.draggables.register(card, {
+  ...PointerSensor.configure({
+    activatorElements: [handle1, handle2],
+  }),
+});
+
+// Or use a function
+const draggable2 = manager.registry.draggables.register(card2, {
+  ...PointerSensor.configure({
+    activatorElements: (source) => {
+      return Array.from(source.element.querySelectorAll('.drag-handle'));
+    },
+  }),
+});
+```
+
+## Complete Example: Mobile-Friendly Sortable List
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {
+  PointerSensor,
+  PointerActivationConstraints,
+  KeyboardSensor,
+} from '@dnd-kit/dom/sensors';
+import {Accessibility, Feedback} from '@dnd-kit/dom/plugins';
+
+const manager = new DragDropManager({
+  sensors: [
+    // Configure pointer sensor for mobile
+    PointerSensor.configure({
+      activationConstraints: (event, source) => {
+        const {pointerType, target} = event;
+        
+        // Immediate activation for desktop on handles
+        if (pointerType === 'mouse' && source.handle?.contains(target)) {
+          return undefined;
+        }
+        
+        // Touch: longer delay to distinguish from scrolling
+        if (pointerType === 'touch') {
+          return [
+            new PointerActivationConstraints.Delay({
+              value: 300,
+              tolerance: 8, // Allow some movement for scrolling
+            }),
+          ];
+        }
+        
+        // Default for pen
+        return [
+          new PointerActivationConstraints.Distance({value: 5}),
+        ];
+      },
+      
+      preventActivation: (event, source) => {
+        // Don't activate on interactive elements
+        const target = event.target;
+        if (target.matches('button, a, input, select, textarea')) {
+          return true;
+        }
+        return false;
+      },
+    }),
+    
+    // Configure keyboard sensor
+    KeyboardSensor.configure({
+      offset: 20,
+      preventActivation: (event, source) => {
+        // Only activate from the drag handle
+        const target = source.handle ?? source.element;
+        return event.target !== target;
+      },
+    }),
+  ],
+  
+  plugins: [
+    new Accessibility(manager, {
+      screenReaderInstructions: {
+        draggable: 'Press space to grab. Arrow keys to move. Space to drop. Escape to cancel.',
+      },
+    }),
+    new Feedback(manager, {
+      feedback: 'default',
+      keyboardTransition: {
+        duration: 200,
+        easing: 'ease-out',
+      },
+    }),
+  ],
+});
+
+// Register list items
+const items = document.querySelectorAll('.list-item');
+items.forEach((item) => {
+  const handle = item.querySelector('.drag-handle');
+  
+  manager.registry.draggables.register(item, {
+    handle,
+  });
+  
+  manager.registry.droppables.register(item);
+});
+```
+
+## Handling Different Pointer Types
+
+Detect and handle different input methods:
+
+```typescript
+manager.monitor.addEventListener('dragstart', ({operation}) => {
+  const {activatorEvent} = operation;
+  
+  if (activatorEvent instanceof PointerEvent) {
+    const {pointerType} = activatorEvent;
+    
+    if (pointerType === 'touch') {
+      console.log('Touch drag started');
+      // Add touch-specific feedback
+    } else if (pointerType === 'mouse') {
+      console.log('Mouse drag started');
+    } else if (pointerType === 'pen') {
+      console.log('Pen drag started');
+    }
+  } else if (activatorEvent instanceof KeyboardEvent) {
+    console.log('Keyboard drag started');
+  }
+});
+```
+
+## Scroll Into View
+
+The KeyboardSensor automatically scrolls elements into view when keyboard dragging starts:
+
+```typescript packages/dom/src/core/sensors/keyboard/KeyboardSensor.ts
+// Automatically called when drag starts
+// Ensures the dragged element is visible
+```
+
+## AutoScroller Integration
+
+The KeyboardSensor automatically disables AutoScroller during keyboard dragging to prevent conflicts:
+
+```typescript packages/dom/src/core/sensors/keyboard/KeyboardSensor.ts
+// AutoScroller is disabled during keyboard drag
+// Re-enabled when drag ends
+```
+
+## Best Practices
+
+1. **Always include both sensors**: Use both PointerSensor and KeyboardSensor for maximum accessibility.
+
+2. **Test on real devices**: Touch behavior varies across devices - test on actual phones and tablets.
+
+3. **Use appropriate delays for touch**: 250-400ms delays help distinguish dragging from scrolling.
+
+4. **Add visual feedback for long press**: Show a visual indicator during the activation delay.
+
+5. **Provide drag handles on mobile**: Small drag handles are easier to activate on touch devices.
+
+6. **Consider pointer coalescing**: On high-refresh-rate displays, consider throttling pointer events.
+
+7. **Test with keyboard only**: Ensure all functionality works without a mouse.
+
+8. **Respect reduced motion**: The Feedback plugin automatically handles this for keyboard transitions.
+
+9. **Handle activation cancellation**: Provide clear feedback when activation is canceled (e.g., moved too far during delay).
+
+10. **Use semantic HTML**: Proper elements (buttons, etc.) work better with assistive technologies.
+
+## Preventing Native Behaviors
+
+The PointerSensor automatically prevents:
+
+- Native drag and drop
+- Text selection during drag
+- Context menus during drag
+- Click events after successful drag
+- Scroll during touch drag
+
+## Window Resize Handling
+
+The KeyboardSensor automatically cancels keyboard drag operations when the window is resized, preventing layout issues.

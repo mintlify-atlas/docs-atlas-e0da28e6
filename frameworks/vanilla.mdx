@@ -1,0 +1,313 @@
+---
+title: Vanilla JavaScript
+description: Use dnd-kit with vanilla JavaScript and TypeScript
+---
+
+## Overview
+
+The vanilla JavaScript adapter provides framework-agnostic drag and drop functionality through the core `@dnd-kit/dom` package. Use this when you're building without a framework or want direct control over the DOM.
+
+## Installation
+
+Install the core packages:
+
+<CodeGroup>
+```bash npm
+npm install @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash yarn
+yarn add @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash pnpm
+pnpm add @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash bun
+bun add @dnd-kit/dom @dnd-kit/abstract
+```
+</CodeGroup>
+
+## Getting Started
+
+<Steps>
+  <Step title="Create a DragDropManager">
+    Initialize the drag and drop manager that coordinates all interactions:
+
+    ```typescript
+    import {DragDropManager} from '@dnd-kit/dom';
+
+    const manager = new DragDropManager();
+    ```
+  </Step>
+
+  <Step title="Create draggable elements">
+    Register elements as draggable:
+
+    ```typescript
+    import {Draggable} from '@dnd-kit/dom';
+
+    const draggableElement = document.getElementById('draggable-1');
+
+    const draggable = new Draggable(
+      {
+        id: 'draggable-1',
+        element: draggableElement,
+      },
+      manager
+    );
+    ```
+  </Step>
+
+  <Step title="Create droppable zones">
+    Register elements as drop targets:
+
+    ```typescript
+    import {Droppable} from '@dnd-kit/dom';
+
+    const droppableElement = document.getElementById('droppable-1');
+
+    const droppable = new Droppable(
+      {
+        id: 'droppable-1',
+        element: droppableElement,
+      },
+      manager
+    );
+    ```
+  </Step>
+
+  <Step title="Listen to drag events">
+    Subscribe to drag and drop events:
+
+    ```typescript
+    manager.monitor.addEventListener('dragstart', (event) => {
+      console.log('Drag started:', event.operation.source.id);
+    });
+
+    manager.monitor.addEventListener('dragend', (event) => {
+      const {source, target} = event.operation;
+      console.log('Dropped', source.id, 'on', target?.id);
+    });
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a full working example:
+
+```typescript
+import {DragDropManager, Draggable, Droppable} from '@dnd-kit/dom';
+
+// Initialize the manager
+const manager = new DragDropManager();
+
+// Create draggable items
+const draggableElements = document.querySelectorAll('[data-draggable]');
+draggableElements.forEach((element) => {
+  new Draggable(
+    {
+      id: element.id,
+      element: element as HTMLElement,
+      data: {
+        label: element.textContent,
+      },
+    },
+    manager
+  );
+});
+
+// Create droppable zones
+const droppableElements = document.querySelectorAll('[data-droppable]');
+droppableElements.forEach((element) => {
+  new Droppable(
+    {
+      id: element.id,
+      element: element as HTMLElement,
+    },
+    manager
+  );
+});
+
+// Handle drag events
+manager.monitor.addEventListener('dragstart', (event) => {
+  event.operation.source.element?.classList.add('dragging');
+});
+
+manager.monitor.addEventListener('dragover', (event) => {
+  event.operation.target?.element?.classList.add('drag-over');
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  event.operation.source.element?.classList.remove('dragging');
+  event.operation.target?.element?.classList.remove('drag-over');
+});
+
+// Cleanup when done
+window.addEventListener('beforeunload', () => {
+  manager.destroy();
+});
+```
+
+## Sortable Lists
+
+Create sortable lists using the `Sortable` class:
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {Sortable} from '@dnd-kit/dom/sortable';
+
+const manager = new DragDropManager();
+
+const items = ['Item 1', 'Item 2', 'Item 3'];
+const listElement = document.getElementById('sortable-list');
+
+items.forEach((item, index) => {
+  const element = document.createElement('div');
+  element.textContent = item;
+  element.id = `item-${index}`;
+  listElement.appendChild(element);
+
+  new Sortable(
+    {
+      id: element.id,
+      element: element,
+      group: 'list',
+      index: index,
+    },
+    manager
+  );
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const source = event.operation.source;
+  const target = event.operation.target;
+  
+  if (source && target) {
+    // Update your state/data based on the new order
+    console.log(`Moved ${source.id} to position ${target.index}`);
+  }
+});
+```
+
+## Advanced Features
+
+### Custom Drag Handles
+
+Specify a different element as the drag handle:
+
+```typescript
+const draggableElement = document.getElementById('card');
+const handleElement = document.getElementById('drag-handle');
+
+new Draggable(
+  {
+    id: 'card',
+    element: draggableElement,
+    handle: handleElement,
+  },
+  manager
+);
+```
+
+### Modifiers
+
+Apply modifiers to constrain or modify drag behavior:
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {restrictToHorizontalAxis} from '@dnd-kit/abstract/modifiers';
+
+const manager = new DragDropManager({
+  modifiers: [restrictToHorizontalAxis],
+});
+```
+
+### Sensors
+
+Customize how drag operations are initiated:
+
+```typescript
+import {DragDropManager} from '@dnd-kit/dom';
+import {PointerSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    new PointerSensor({
+      activationConstraint: {
+        distance: 10, // Require 10px movement before dragging
+      },
+    }),
+  ],
+});
+```
+
+## Type Safety
+
+Add type safety to your drag and drop data:
+
+```typescript
+interface CardData {
+  id: string;
+  title: string;
+  status: 'todo' | 'in-progress' | 'done';
+}
+
+const draggable = new Draggable<CardData>(
+  {
+    id: 'card-1',
+    element: cardElement,
+    data: {
+      id: 'card-1',
+      title: 'Implement feature',
+      status: 'todo',
+    },
+  },
+  manager
+);
+
+manager.monitor.addEventListener('dragend', (event) => {
+  const data = event.operation.source.data;
+  console.log(data.title); // Type-safe access
+});
+```
+
+## Cleanup
+
+Always destroy the manager when you're done:
+
+```typescript
+// Destroy individual entities
+draggable.destroy();
+droppable.destroy();
+
+// Or destroy the entire manager (destroys all registered entities)
+manager.destroy();
+```
+
+## Best Practices
+
+- **Initialize once**: Create your `DragDropManager` instance once and reuse it
+- **Clean up**: Always call `destroy()` to prevent memory leaks
+- **Use data property**: Store metadata on draggables for easier event handling
+- **Batch updates**: Apply multiple changes together for better performance
+- **Element references**: Keep element references up to date when DOM changes
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Configure how drag operations are initiated
+  </Card>
+  <Card title="Modifiers" icon="sliders" href="/concepts/modifiers">
+    Constrain and modify drag behavior
+  </Card>
+  <Card title="Collision Detection" icon="bullseye" href="/concepts/collision-detection">
+    Control how droppable targets are detected
+  </Card>
+  <Card title="Events" icon="bolt" href="/api/abstract/drag-drop-manager#events">
+    Listen to all available drag and drop events
+  </Card>
+</CardGroup>

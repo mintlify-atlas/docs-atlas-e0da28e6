@@ -1,0 +1,534 @@
+---
+title: Svelte
+description: Use dnd-kit with Svelte 5 applications
+---
+
+## Overview
+
+The Svelte adapter provides functions and components that integrate drag and drop functionality into your Svelte 5 applications using runes and the modern Svelte API.
+
+## Installation
+
+Install the Svelte package and its dependencies:
+
+<CodeGroup>
+```bash npm
+npm install @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash yarn
+yarn add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash pnpm
+pnpm add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash bun
+bun add @dnd-kit/svelte @dnd-kit/dom @dnd-kit/abstract
+```
+</CodeGroup>
+
+<Info>
+  **Requirements**: Svelte 5.29.0 or higher
+</Info>
+
+## Getting Started
+
+<Steps>
+  <Step title="Add DragDropProvider">
+    Wrap your application with the `DragDropProvider` component:
+
+    ```svelte
+    <script>
+      import {DragDropProvider} from '@dnd-kit/svelte';
+    </script>
+
+    <DragDropProvider>
+      <!-- Your app content -->
+    </DragDropProvider>
+    ```
+  </Step>
+
+  <Step title="Create draggable components">
+    Use the `createDraggable` function to make elements draggable:
+
+    ```svelte
+    <script>
+      import {createDraggable} from '@dnd-kit/svelte';
+
+      let {id, title} = $props();
+
+      const {attach, isDragging} = createDraggable({
+        id,
+        data: {title},
+      });
+    </script>
+
+    <div use:attach style:opacity={isDragging ? 0.5 : 1}>
+      {title}
+    </div>
+    ```
+  </Step>
+
+  <Step title="Create droppable zones">
+    Use the `createDroppable` function to create drop targets:
+
+    ```svelte
+    <script>
+      import {createDroppable} from '@dnd-kit/svelte';
+
+      let {id, children} = $props();
+
+      const {attach, isDropTarget} = createDroppable({id});
+    </script>
+
+    <div
+      use:attach
+      style:background-color={isDropTarget ? 'lightblue' : 'transparent'}
+    >
+      {@render children?.()}
+    </div>
+    ```
+  </Step>
+
+  <Step title="Handle drag events">
+    Listen to events via the provider props:
+
+    ```svelte
+    <script>
+      import {DragDropProvider} from '@dnd-kit/svelte';
+
+      function handleDragEnd(event) {
+        const {source, target} = event.operation;
+        console.log('Dropped', source.id, 'on', target?.id);
+      }
+    </script>
+
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <!-- Your components -->
+    </DragDropProvider>
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a full drag and drop implementation:
+
+```svelte
+<!-- App.svelte -->
+<script>
+  import {DragDropProvider} from '@dnd-kit/svelte';
+  import DraggableItem from './DraggableItem.svelte';
+  import DroppableZone from './DroppableZone.svelte';
+
+  let zones = $state({
+    'zone-1': [
+      {id: 'item-1', label: 'Item 1'},
+      {id: 'item-2', label: 'Item 2'},
+    ],
+    'zone-2': [
+      {id: 'item-3', label: 'Item 3'},
+    ],
+  });
+
+  function handleDragEnd(event) {
+    const {source, target} = event.operation;
+    
+    if (!target) return;
+
+    // Remove from all zones
+    for (const zoneId in zones) {
+      zones[zoneId] = zones[zoneId].filter((item) => item.id !== source.id);
+    }
+    
+    // Add to target zone
+    zones[target.id] = [...zones[target.id], source.data];
+  }
+</script>
+
+<DragDropProvider onDragEnd={handleDragEnd}>
+  <div style="display: flex; gap: 16px; padding: 24px;">
+    {#each Object.entries(zones) as [zoneId, items]}
+      <DroppableZone id={zoneId} title={`Zone ${zoneId.split('-')[1]}`}>
+        {#each items as item (item.id)}
+          <DraggableItem id={item.id} label={item.label} />
+        {/each}
+      </DroppableZone>
+    {/each}
+  </div>
+</DragDropProvider>
+```
+
+```svelte
+<!-- DraggableItem.svelte -->
+<script>
+  import {createDraggable} from '@dnd-kit/svelte';
+
+  let {id, label} = $props();
+
+  const {attach, isDragging, isDragSource} = createDraggable({
+    id,
+    data: {label},
+  });
+</script>
+
+<div
+  use:attach
+  style:padding="16px"
+  style:margin="8px"
+  style:background-color={isDragging ? '#e3f2fd' : '#f5f5f5'}
+  style:border={isDragSource ? '2px solid #2196f3' : '1px solid #ddd'}
+  style:border-radius="4px"
+  style:cursor="grab"
+>
+  {label}
+</div>
+```
+
+```svelte
+<!-- DroppableZone.svelte -->
+<script>
+  import {createDroppable} from '@dnd-kit/svelte';
+
+  let {id, title, children} = $props();
+
+  const {attach, isDropTarget} = createDroppable({id});
+</script>
+
+<div
+  use:attach
+  style:min-height="200px"
+  style:padding="16px"
+  style:margin="8px"
+  style:background-color={isDropTarget ? '#e8f5e9' : '#fafafa'}
+  style:border="2px dashed #ccc"
+  style:border-radius="8px"
+>
+  <h3>{title}</h3>
+  {@render children?.()}
+</div>
+```
+
+## Sortable Lists
+
+Create sortable lists with the `createSortable` function:
+
+```svelte
+<script>
+  import {DragDropProvider} from '@dnd-kit/svelte';
+  import {createSortable} from '@dnd-kit/svelte/sortable';
+
+  let items = $state([
+    {id: '1', label: 'Item 1'},
+    {id: '2', label: 'Item 2'},
+    {id: '3', label: 'Item 3'},
+    {id: '4', label: 'Item 4'},
+  ]);
+
+  function handleDragEnd(event) {
+    const {source, target} = event.operation;
+    
+    if (!target || source.index === target.index) return;
+
+    const newItems = [...items];
+    const [removed] = newItems.splice(source.index, 1);
+    newItems.splice(target.index, 0, removed);
+    items = newItems;
+  }
+</script>
+
+<DragDropProvider onDragEnd={handleDragEnd}>
+  <div style="max-width: 400px; padding: 24px;">
+    {#each items as item, index (item.id)}
+      <SortableItem id={item.id} {index} label={item.label} />
+    {/each}
+  </div>
+</DragDropProvider>
+```
+
+```svelte
+<!-- SortableItem.svelte -->
+<script>
+  import {createSortable} from '@dnd-kit/svelte/sortable';
+
+  let {id, index, label} = $props();
+
+  const {attach, isDragging, isDragSource} = createSortable({
+    id,
+    index,
+    group: 'list',
+    data: {label},
+  });
+</script>
+
+<div
+  use:attach
+  style:padding="12px"
+  style:margin="4px 0"
+  style:background-color={isDragging ? '#e3f2fd' : 'white'}
+  style:border={isDragSource ? '2px solid #2196f3' : '1px solid #ddd'}
+  style:border-radius="4px"
+  style:cursor="grab"
+>
+  {label}
+</div>
+```
+
+## Function APIs
+
+### createDraggable
+
+The `createDraggable` function signature from `/home/daytona/workspace/source/packages/svelte/src/core/draggable/createDraggable.svelte.ts:13`:
+
+```typescript
+function createDraggable<T extends Data = Data>(
+  input: CreateDraggableInput<T>
+): {
+  draggable: Draggable<T>;
+  isDragging: boolean;
+  isDropping: boolean;
+  isDragSource: boolean;
+  attach: (node: HTMLElement) => () => void;
+  attachHandle: (node: HTMLElement) => () => void;
+}
+
+interface CreateDraggableInput<T extends Data = Data> {
+  id: string;
+  data?: T;
+  disabled?: boolean;
+  modifiers?: Modifier[];
+  sensors?: Sensor[];
+  plugins?: Plugin[];
+  alignment?: Alignment;
+}
+```
+
+### createDroppable
+
+The `createDroppable` function signature from `/home/daytona/workspace/source/packages/svelte/src/core/droppable/createDroppable.svelte.ts:13`:
+
+```typescript
+function createDroppable<T extends Data = Data>(
+  input: CreateDroppableInput<T>
+): {
+  droppable: Droppable<T>;
+  isDropTarget: boolean;
+  attach: (node: HTMLElement) => () => void;
+}
+
+interface CreateDroppableInput<T extends Data = Data> {
+  id: string;
+  data?: T;
+  disabled?: boolean;
+  accept?: string | string[];
+  type?: string;
+  collisionDetector?: CollisionDetector;
+}
+```
+
+### createSortable
+
+The `createSortable` function signature from `/home/daytona/workspace/source/packages/svelte/src/sortable/createSortable.svelte.ts:14`:
+
+```typescript
+function createSortable<T extends Data = Data>(
+  input: CreateSortableInput<T>
+): {
+  sortable: Sortable<T>;
+  isDragging: boolean;
+  isDropping: boolean;
+  isDragSource: boolean;
+  isDropTarget: boolean;
+  attach: (node: HTMLElement) => () => void;
+  attachHandle: (node: HTMLElement) => () => void;
+  attachSource: (node: HTMLElement) => () => void;
+  attachTarget: (node: HTMLElement) => () => void;
+}
+
+interface CreateSortableInput<T extends Data = Data> {
+  id: string;
+  group: string;
+  index: number;
+  data?: T;
+  disabled?: boolean;
+  type?: string;
+  accept?: string | string[];
+  modifiers?: Modifier[];
+  sensors?: Sensor[];
+  plugins?: Plugin[];
+  collisionDetector?: CollisionDetector;
+  collisionPriority?: number;
+  transition?: SortableTransition;
+  alignment?: Alignment;
+}
+```
+
+## Advanced Features
+
+### Drag Handles
+
+Use separate elements for dragging:
+
+```svelte
+<script>
+  import {createDraggable} from '@dnd-kit/svelte';
+
+  let {id, title} = $props();
+
+  const {attach, attachHandle, isDragging} = createDraggable({id});
+</script>
+
+<div use:attach style:opacity={isDragging ? 0.5 : 1}>
+  <div use:attachHandle style:cursor="grab" style:padding="8px">☰</div>
+  <div>{title}</div>
+</div>
+```
+
+### Modifiers
+
+Constrain drag behavior:
+
+```svelte
+<script>
+  import {DragDropProvider} from '@dnd-kit/svelte';
+  import {restrictToVerticalAxis} from '@dnd-kit/abstract/modifiers';
+
+  const modifiers = [restrictToVerticalAxis];
+</script>
+
+<DragDropProvider {modifiers}>
+  <!-- Content -->
+</DragDropProvider>
+```
+
+### Sensors
+
+Customize activation:
+
+```svelte
+<script>
+  import {DragDropProvider} from '@dnd-kit/svelte';
+  import {PointerSensor} from '@dnd-kit/dom';
+
+  const sensors = [
+    new PointerSensor({
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+  ];
+</script>
+
+<DragDropProvider {sensors}>
+  <!-- Content -->
+</DragDropProvider>
+```
+
+### Type Safety
+
+Define custom data types:
+
+```svelte
+<script lang="ts">
+  import {createDraggable} from '@dnd-kit/svelte';
+
+  interface TaskData {
+    id: string;
+    title: string;
+    priority: 'low' | 'medium' | 'high';
+  }
+
+  let {task}: {task: TaskData} = $props();
+
+  const {attach, isDragging} = createDraggable<TaskData>({
+    id: task.id,
+    data: task,
+  });
+</script>
+
+<div use:attach>
+  <h3>{task.title}</h3>
+  <span>Priority: {task.priority}</span>
+</div>
+```
+
+## Svelte 5 Runes
+
+The adapter uses Svelte 5's runes for reactivity:
+
+```svelte
+<script>
+  import {createDraggable} from '@dnd-kit/svelte';
+
+  // Props are reactive using $props()
+  let {id} = $props();
+
+  // State is reactive using $state()
+  let isDisabled = $state(false);
+
+  // Derived state uses $derived()
+  let label = $derived(`Item ${id}`);
+
+  const {attach, isDragging} = createDraggable({
+    id,
+    disabled: isDisabled,
+    data: {label},
+  });
+
+  // Effects use $effect()
+  $effect(() => {
+    console.log('Dragging state changed:', isDragging);
+  });
+</script>
+
+<div use:attach>
+  {label}
+  <button onclick={() => isDisabled = !isDisabled}>
+    {isDisabled ? 'Enable' : 'Disable'}
+  </button>
+</div>
+```
+
+## Actions (use:directive)
+
+All attach functions return cleanup functions, making them perfect for use with Svelte actions:
+
+```svelte
+<script>
+  const {attach, attachHandle} = createDraggable({id: 'card'});
+</script>
+
+<!-- The attach action automatically handles cleanup -->
+<div use:attach>
+  <div use:attachHandle>Drag Handle</div>
+  <div>Content</div>
+</div>
+```
+
+## Best Practices
+
+- **Stable IDs**: Use consistent, unique IDs for draggables and droppables
+- **Key blocks**: Always use proper keys in `{#each}` blocks for sortables
+- **Runes**: Leverage Svelte 5 runes for reactive inputs
+- **Actions**: Use `use:attach` directives for clean element binding
+- **Cleanup**: Actions automatically handle cleanup when components unmount
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sortable Lists" icon="list" href="/guides/sortable">
+    Build sortable lists with animations
+  </Card>
+  <Card title="Multiple Containers" icon="grid" href="/examples/multiple-containers">
+    Drag between multiple containers
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Configure interaction methods
+  </Card>
+  <Card title="Events" icon="bolt" href="/api/abstract/drag-drop-manager#events">
+    Handle drag and drop events
+  </Card>
+</CardGroup>

@@ -1,0 +1,231 @@
+---
+title: Simple Drag and Drop
+description: Learn how to create a basic drag and drop interface with dnd-kit
+---
+
+## Overview
+
+This guide walks you through creating a simple drag and drop interface using dnd-kit. You'll learn the fundamental concepts of making elements draggable and droppable, and how to manage state when items are moved between containers.
+
+## What You'll Build
+
+A basic drag and drop interface where you can:
+- Drag an item from its initial position
+- Drop it into a designated drop zone
+- See visual feedback when hovering over the drop zone
+
+## Installation
+
+First, install the required packages:
+
+```bash
+npm install @dnd-kit/react @dnd-kit/abstract
+```
+
+## Implementation
+
+<Steps>
+
+### Set up the DragDropProvider
+
+The `DragDropProvider` component wraps your application and provides the drag and drop context. This is required for all dnd-kit functionality.
+
+```tsx
+import { DragDropProvider } from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Your draggable and droppable components go here */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Create a Draggable Component
+
+Use the `useDraggable` hook to make an element draggable. The hook requires a unique `id` and returns a `ref` that you attach to your element.
+
+```tsx
+import { useDraggable } from '@dnd-kit/react';
+
+function Draggable({ id }: { id: string }) {
+  const { ref } = useDraggable({ id });
+
+  return (
+    <button ref={ref} className="btn">
+      Drag me
+    </button>
+  );
+}
+```
+
+**Key concepts:**
+- The `id` must be unique across all draggable items
+- The `ref` connects the hook to the DOM element
+- Any element can be made draggable by attaching the ref
+
+### Create a Droppable Component
+
+Use the `useDroppable` hook to create drop zones. The hook provides an `isDropTarget` boolean that indicates when a draggable item is over the drop zone.
+
+```tsx
+import { useDroppable } from '@dnd-kit/react';
+
+function Droppable({ id, children }: { id: string; children?: React.ReactNode }) {
+  const { ref, isDropTarget } = useDroppable({ id });
+
+  return (
+    <div 
+      ref={ref} 
+      className={isDropTarget ? "droppable active" : "droppable"}
+    >
+      {children}
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- `isDropTarget` becomes `true` when a draggable is hovering over this drop zone
+- Use this to provide visual feedback to users
+- The `children` prop allows you to render content inside the drop zone
+
+### Manage State with onDragEnd
+
+Handle the `onDragEnd` event to update your application state when a drag operation completes.
+
+```tsx
+import { useState } from 'react';
+import { DragDropProvider, useDraggable, useDroppable } from '@dnd-kit/react';
+
+function App() {
+  const [parent, setParent] = useState<string | undefined>(undefined);
+  const draggable = <Draggable id="draggable" />;
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        if (event.canceled) return;
+        setParent(event.operation.target?.id as string);
+      }}
+    >
+      <section className="drop-layout">
+        {parent == null ? draggable : null}
+        <Droppable id="droppable">
+          {parent === 'droppable' ? draggable : null}
+        </Droppable>
+      </section>
+    </DragDropProvider>
+  );
+}
+```
+
+**Key concepts:**
+- `event.canceled` is `true` if the drag was cancelled (e.g., user pressed Escape)
+- `event.operation.target?.id` contains the ID of the drop target
+- Re-render the draggable component in its new parent based on state
+
+</Steps>
+
+## Complete Example
+
+Here's the full working code:
+
+```tsx
+import React, { useState } from 'react';
+import { DragDropProvider, useDraggable, useDroppable } from '@dnd-kit/react';
+
+function Draggable({ id }: { id: string }) {
+  const { ref } = useDraggable({ id });
+
+  return <button ref={ref} className="btn">Drag me</button>;
+}
+
+function Droppable({ id, children }: { id: string; children?: React.ReactNode }) {
+  const { ref, isDropTarget } = useDroppable({ id });
+
+  return (
+    <div ref={ref} className={isDropTarget ? "droppable active" : "droppable"}>
+      {children}
+    </div>
+  );
+}
+
+export default function App() {
+  const [parent, setParent] = useState<string | undefined>(undefined);
+  const draggable = <Draggable id="draggable" />;
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        if (event.canceled) return;
+        setParent(event.operation.target?.id as string);
+      }}
+    >
+      <section className="drop-layout">
+        {parent == null ? draggable : null}
+        <Droppable id="droppable">
+          {parent === 'droppable' ? draggable : null}
+        </Droppable>
+      </section>
+    </DragDropProvider>
+  );
+}
+```
+
+## Styling
+
+Add basic CSS to make the interface visually clear:
+
+```css
+.btn {
+  padding: 12px 24px;
+  background: #0070f3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: grab;
+}
+
+.btn:active {
+  cursor: grabbing;
+}
+
+.droppable {
+  min-height: 150px;
+  padding: 20px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background: #f5f5f5;
+  transition: all 0.2s;
+}
+
+.droppable.active {
+  border-color: #0070f3;
+  background: #e3f2fd;
+}
+
+.drop-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 40px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+```
+
+## Key Takeaways
+
+- **DragDropProvider** wraps your app and provides drag and drop context
+- **useDraggable** makes elements draggable by providing a ref
+- **useDroppable** creates drop zones with visual feedback via `isDropTarget`
+- **onDragEnd** event handler updates state when drag operations complete
+- Check `event.canceled` to handle cancelled drag operations
+- Use `event.operation.target?.id` to identify where the item was dropped
+
+## Next Steps
+
+- Learn about [Multiple Containers](/examples/multiple-containers) for more complex layouts
+- Explore [Nested Contexts](/examples/nested-contexts) for advanced use cases

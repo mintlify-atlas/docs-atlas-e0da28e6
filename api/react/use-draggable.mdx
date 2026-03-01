@@ -1,0 +1,320 @@
+---
+title: 'useDraggable'
+description: 'Hook to make an element draggable'
+---
+
+The `useDraggable` hook makes an element draggable. It registers the element with the drag and drop manager, attaches sensors, and provides reactive state about the drag status.
+
+## Usage
+
+```tsx
+import {useDraggable} from '@dnd-kit/react';
+
+function DraggableItem({id}) {
+  const {ref, isDragging} = useDraggable({id});
+
+  return (
+    <div ref={ref} style={{opacity: isDragging ? 0.5 : 1}}>
+      Drag me
+    </div>
+  );
+}
+```
+
+## Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for this draggable element. Used to track the element during drag operations.
+
+  ```tsx
+  const {ref} = useDraggable({id: 'item-1'});
+  ```
+</ParamField>
+
+<ParamField path="element" type="Element | RefObject<Element>">
+  The DOM element to make draggable. If not provided, use the `ref` from the return value.
+
+  ```tsx
+  const elementRef = useRef(null);
+  useDraggable({id: 'item', element: elementRef});
+  ```
+</ParamField>
+
+<ParamField path="handle" type="Element | RefObject<Element>">
+  A specific element to use as the drag handle. If provided, dragging can only be initiated from this element.
+
+  ```tsx
+  function DraggableWithHandle() {
+    const {ref, handleRef} = useDraggable({id: 'item'});
+
+    return (
+      <div ref={ref}>
+        <div ref={handleRef} style={{cursor: 'grab'}}>
+          ⋮⋮ Drag handle
+        </div>
+        <div>Content</div>
+      </div>
+    );
+  }
+  ```
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to this draggable. Accessible during drag operations and in event handlers.
+
+  ```tsx
+  const {ref} = useDraggable({
+    id: 'item-1',
+    data: {label: 'First Item', category: 'A'},
+  });
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Whether this draggable is disabled. Disabled draggables cannot be dragged.
+
+  ```tsx
+  const {ref} = useDraggable({
+    id: 'item',
+    disabled: true,
+  });
+  ```
+</ParamField>
+
+<ParamField path="sensors" type="Sensor[]">
+  Override the sensors for this specific draggable. By default, inherits from `DragDropProvider`.
+
+  ```tsx
+  import {PointerSensor} from '@dnd-kit/react';
+
+  const {ref} = useDraggable({
+    id: 'item',
+    sensors: [new PointerSensor()],
+  });
+  ```
+</ParamField>
+
+<ParamField path="modifiers" type="Modifier[]">
+  Modifiers that transform the position during drag. Applied in addition to provider-level modifiers.
+
+  ```tsx
+  import {restrictToVerticalAxis} from '@dnd-kit/modifiers';
+
+  const {ref} = useDraggable({
+    id: 'item',
+    modifiers: [restrictToVerticalAxis],
+  });
+  ```
+</ParamField>
+
+<ParamField path="plugins" type="Plugin[]">
+  Plugins specific to this draggable. Applied in addition to provider-level plugins.
+</ParamField>
+
+<ParamField path="alignment" type="{x: number, y: number}">
+  Alignment point for the drag source, relative to the element's position. Values are percentages (0-1).
+
+  ```tsx
+  // Align to center of element
+  const {ref} = useDraggable({
+    id: 'item',
+    alignment: {x: 0.5, y: 0.5},
+  });
+  ```
+</ParamField>
+
+## Return Value
+
+<ResponseField name="ref" type="(element: Element | null) => void">
+  Callback ref to attach to the draggable element.
+
+  ```tsx
+  const {ref} = useDraggable({id: 'item'});
+  return <div ref={ref}>Draggable</div>;
+  ```
+</ResponseField>
+
+<ResponseField name="handleRef" type="(element: Element | null) => void">
+  Callback ref to attach to a drag handle element.
+
+  ```tsx
+  const {ref, handleRef} = useDraggable({id: 'item'});
+  return (
+    <div ref={ref}>
+      <div ref={handleRef}>⋮⋮</div>
+    </div>
+  );
+  ```
+</ResponseField>
+
+<ResponseField name="draggable" type="Draggable<T>">
+  The underlying `Draggable` instance. Access this for advanced use cases.
+</ResponseField>
+
+<ResponseField name="isDragging" type="boolean">
+  Whether this element is currently being dragged.
+
+  ```tsx
+  const {ref, isDragging} = useDraggable({id: 'item'});
+  return (
+    <div ref={ref} style={{opacity: isDragging ? 0.5 : 1}}>
+      {isDragging ? 'Dragging...' : 'Drag me'}
+    </div>
+  );
+  ```
+</ResponseField>
+
+<ResponseField name="isDropping" type="boolean">
+  Whether this element is in the dropping animation phase (after release, before settling).
+</ResponseField>
+
+<ResponseField name="isDragSource" type="boolean">
+  Whether this element is the source of the current drag operation (true during dragging and dropping).
+</ResponseField>
+
+## Examples
+
+### Basic Draggable
+
+```tsx
+function BasicDraggable() {
+  const {ref, isDragging} = useDraggable({id: 'basic'});
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '20px',
+        border: '2px solid black',
+        opacity: isDragging ? 0.5 : 1,
+        cursor: 'grab',
+      }}
+    >
+      Drag me
+    </div>
+  );
+}
+```
+
+### Draggable with Custom Data
+
+```tsx
+interface ItemData {
+  label: string;
+  category: string;
+}
+
+function DraggableItem({id, label, category}: ItemData & {id: string}) {
+  const {ref, isDragging} = useDraggable<ItemData>({
+    id,
+    data: {label, category},
+  });
+
+  return (
+    <div ref={ref} className={isDragging ? 'dragging' : ''}>
+      <h3>{label}</h3>
+      <span>{category}</span>
+    </div>
+  );
+}
+```
+
+### Draggable with Handle
+
+```tsx
+function DraggableCard() {
+  const {ref, handleRef, isDragging} = useDraggable({id: 'card'});
+
+  return (
+    <div ref={ref} className="card">
+      <div
+        ref={handleRef}
+        style={{
+          cursor: isDragging ? 'grabbing' : 'grab',
+          padding: '10px',
+          background: '#f0f0f0',
+        }}
+      >
+        ⋮⋮ Drag here
+      </div>
+      <div style={{padding: '20px'}}>
+        <h3>Card Content</h3>
+        <p>This content is not draggable, only the handle above.</p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Conditionally Disabled
+
+```tsx
+function ConditionalDraggable({id, locked}) {
+  const {ref, isDragging} = useDraggable({
+    id,
+    disabled: locked,
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: locked ? 0.5 : isDragging ? 0.7 : 1,
+        cursor: locked ? 'not-allowed' : 'grab',
+      }}
+    >
+      {locked ? '🔒 Locked' : 'Drag me'}
+    </div>
+  );
+}
+```
+
+### With Custom Modifiers
+
+```tsx
+import {restrictToHorizontalAxis} from '@dnd-kit/modifiers';
+
+function HorizontalDraggable() {
+  const {ref} = useDraggable({
+    id: 'horizontal',
+    modifiers: [restrictToHorizontalAxis],
+  });
+
+  return (
+    <div ref={ref} style={{padding: '20px', border: '2px solid blue'}}>
+      Can only drag horizontally
+    </div>
+  );
+}
+```
+
+## Type Safety
+
+Use TypeScript generics to type the custom data:
+
+```tsx
+interface TaskData {
+  title: string;
+  priority: 'low' | 'medium' | 'high';
+  assignee: string;
+}
+
+function DraggableTask({task}: {task: TaskData & {id: string}}) {
+  const {ref, isDragging} = useDraggable<TaskData>({
+    id: task.id,
+    data: {
+      title: task.title,
+      priority: task.priority,
+      assignee: task.assignee,
+    },
+  });
+
+  return <div ref={ref}>{task.title}</div>;
+}
+```
+
+## Related
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Context provider for drag and drop
+- [useDroppable](/api/react/use-droppable) — Create drop targets
+- [DragOverlay](/api/react/drag-overlay) — Render a custom drag overlay

@@ -1,0 +1,290 @@
+---
+title: Introduction
+description: A modern, lightweight, performant, accessible and extensible drag and drop toolkit for the web
+---
+
+<img
+  className="block dark:hidden"
+  src="https://raw.githubusercontent.com/clauderic/dnd-kit/main/.github/assets/dnd-kit-hero-banner.svg"
+  alt="@dnd-kit Hero"
+/>
+<img
+  className="hidden dark:block"
+  src="https://raw.githubusercontent.com/clauderic/dnd-kit/main/.github/assets/dnd-kit-hero-banner.svg"
+  alt="@dnd-kit Hero"
+/>
+
+## Welcome to dnd-kit
+
+dnd-kit is a modern, lightweight, performant, accessible and extensible drag and drop toolkit for the web. It's built with a framework-agnostic core and provides adapters for popular frameworks like React, Vue, Svelte, and SolidJS.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running with your first drag and drop interface in minutes
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install dnd-kit in your project with your preferred package manager
+  </Card>
+  <Card
+    title="API reference"
+    icon="code"
+    href="/api/abstract/overview"
+  >
+    Explore the complete API documentation and type definitions
+  </Card>
+  <Card
+    title="Examples"
+    icon="sparkles"
+    href="/examples/simple-drag-drop"
+  >
+    Browse interactive examples and learn best practices
+  </Card>
+</CardGroup>
+
+## Why dnd-kit?
+
+dnd-kit stands out from other drag and drop libraries with its unique architecture and feature set:
+
+### Framework agnostic core
+
+The architecture is built in layers—a framework-agnostic core (`@dnd-kit/abstract`), a DOM implementation (`@dnd-kit/dom`), and thin adapters for your framework of choice. This means you can use the same drag and drop logic across different frameworks.
+
+<CodeGroup>
+
+```tsx React
+import {DragDropProvider, useDraggable} from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider>
+      <DraggableItem id="item-1" />
+    </DragDropProvider>
+  );
+}
+```
+
+```vue Vue
+<script setup>
+import {DragDropProvider, useDraggable} from '@dnd-kit/vue';
+</script>
+
+<template>
+  <DragDropProvider>
+    <DraggableItem id="item-1" />
+  </DragDropProvider>
+</template>
+```
+
+```svelte Svelte
+<script>
+import {DragDropProvider} from '@dnd-kit/svelte';
+</script>
+
+<DragDropProvider>
+  <DraggableItem id="item-1" />
+</DragDropProvider>
+```
+
+</CodeGroup>
+
+### Wide range of use cases
+
+Supports a diverse set of drag and drop patterns:
+
+- Sortable lists (vertical and horizontal)
+- Grid layouts with variable sized items
+- Multiple containers and nested contexts
+- Virtualized lists for performance
+- 2D games and canvas applications
+- Custom interactions and behaviors
+
+### Built-in accessibility
+
+Accessibility is a first-class citizen in dnd-kit:
+
+<AccordionGroup>
+  <Accordion title="Keyboard support">
+    Full keyboard navigation support out of the box. Users can activate drag operations with Space or Enter, move items with arrow keys, and cancel with Escape.
+  </Accordion>
+  <Accordion title="Screen reader support">
+    Sensible default ARIA attributes and customizable screen reader instructions ensure users with assistive technologies can understand and interact with your drag and drop interfaces.
+  </Accordion>
+  <Accordion title="Live regions">
+    Built-in ARIA live regions announce drag and drop operations to screen reader users in real-time.
+  </Accordion>
+</AccordionGroup>
+
+### Performance focused
+
+Built with performance in mind to support silky smooth animations even with large lists:
+
+- Minimal DOM updates during drag operations
+- Efficient collision detection algorithms
+- Support for virtualized lists
+- Optimized re-rendering strategies
+- GPU-accelerated transforms
+
+### Fully customizable
+
+Customize every aspect of the drag and drop experience:
+
+<CardGroup cols={3}>
+  <Card title="Sensors" icon="hand-pointer">
+    Pointer, mouse, touch, and keyboard sensors with customizable activation constraints
+  </Card>
+  <Card title="Modifiers" icon="sliders">
+    Snap to grid, restrict to axis, apply constraints, and create custom modifiers
+  </Card>
+  <Card title="Collision detection" icon="bullseye">
+    Multiple algorithms included, or build your own custom collision detection
+  </Card>
+  <Card title="Animations" icon="wand-magic-sparkles">
+    Full control over transitions, animations, and visual feedback
+  </Card>
+  <Card title="Plugins" icon="puzzle-piece">
+    Extend functionality with plugins like Debug, Feedback, and custom implementations
+  </Card>
+  <Card title="Styling" icon="paintbrush">
+    Complete control over styles, no CSS required, bring your own styling solution
+  </Card>
+</CardGroup>
+
+## Architecture overview
+
+Understanding dnd-kit's layered architecture helps you make the most of the library:
+
+```mermaid
+graph TB
+    A[@dnd-kit/react] --> B[@dnd-kit/dom]
+    C[@dnd-kit/vue] --> B
+    D[@dnd-kit/svelte] --> B
+    E[@dnd-kit/solid] --> B
+    B --> F[@dnd-kit/abstract]
+    B --> G[@dnd-kit/collision]
+    B --> H[@dnd-kit/geometry]
+    F --> I[@dnd-kit/state]
+    F --> J[@dnd-kit/helpers]
+```
+
+<Steps>
+  <Step title="Abstract core (@dnd-kit/abstract)">
+    Framework-agnostic core that defines the fundamental drag and drop concepts, interfaces, and base classes.
+  </Step>
+  <Step title="DOM layer (@dnd-kit/dom)">
+    DOM-specific implementation that handles browser events, sensors, and rendering for web applications.
+  </Step>
+  <Step title="Framework adapters">
+    Thin adapters for React, Vue, Svelte, and SolidJS that provide framework-specific hooks, components, and patterns.
+  </Step>
+</Steps>
+
+## Core concepts
+
+Before diving into the code, familiarize yourself with these core concepts:
+
+### Draggable
+
+A **draggable** is any element that can be picked up and moved. You create draggables using the `useDraggable` hook (or equivalent in your framework).
+
+```tsx
+const {ref, isDragging} = useDraggable({
+  id: 'unique-id',
+  element: elementRef,
+});
+```
+
+### Droppable
+
+A **droppable** is a designated area where draggables can be dropped. Create droppables using the `useDroppable` hook.
+
+```tsx
+const {ref, isDropTarget} = useDroppable({
+  id: 'droppable-area',
+  element: elementRef,
+});
+```
+
+### DragDropProvider
+
+The **DragDropProvider** wraps your drag and drop interface and manages the drag operation state, event handling, and coordination between draggables and droppables.
+
+```tsx
+<DragDropProvider
+  onDragStart={(event) => console.log('Drag started', event)}
+  onDragEnd={(event) => console.log('Drag ended', event)}
+>
+  {/* Your draggables and droppables */}
+</DragDropProvider>
+```
+
+### Sensors
+
+Sensors detect input methods (pointer, mouse, touch, keyboard) and initiate drag operations. You can configure which sensors to use and their activation constraints.
+
+### Modifiers
+
+Modifiers transform the position of draggable elements during a drag operation. Common modifiers include restricting movement to an axis or snapping to a grid.
+
+## Packages
+
+<CardGroup cols={2}>
+  <Card title="@dnd-kit/abstract" icon="cube">
+    Framework-agnostic core package with fundamental drag and drop primitives
+  </Card>
+  <Card title="@dnd-kit/dom" icon="browser">
+    DOM-specific implementation with sensors, collision detection, and rendering
+  </Card>
+  <Card title="@dnd-kit/react" icon="react">
+    React hooks and components for building drag and drop interfaces
+  </Card>
+  <Card title="@dnd-kit/vue" icon="vuejs">
+    Vue composables and components for drag and drop functionality
+  </Card>
+  <Card title="@dnd-kit/svelte" icon="svelte">
+    Svelte stores and components for drag and drop interactions
+  </Card>
+  <Card title="@dnd-kit/solid" icon="solid">
+    SolidJS primitives and components for drag and drop
+  </Card>
+  <Card title="@dnd-kit/collision" icon="bullseye">
+    Collision detection algorithms for determining drop targets
+  </Card>
+  <Card title="@dnd-kit/geometry" icon="ruler">
+    Geometry utilities for calculating positions, distances, and intersections
+  </Card>
+  <Card title="@dnd-kit/state" icon="database">
+    Reactive state management utilities
+  </Card>
+  <Card title="@dnd-kit/helpers" icon="screwdriver-wrench">
+    Helper functions for common drag and drop operations
+  </Card>
+</CardGroup>
+
+## Next steps
+
+Ready to build your first drag and drop interface?
+
+<CardGroup cols={2}>
+  <Card
+    title="Install dnd-kit"
+    icon="download"
+    href="/installation"
+  >
+    Choose your framework and install the necessary packages
+  </Card>
+  <Card
+    title="Follow the quick start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Build a working drag and drop example in minutes
+  </Card>
+</CardGroup>

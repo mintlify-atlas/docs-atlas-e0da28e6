@@ -1,0 +1,692 @@
+---
+title: 'Plugins'
+description: 'Extend drag and drop functionality with reusable, composable behaviors'
+---
+
+`Plugin` is the abstract base class for extending drag and drop functionality. Plugins provide a way to add custom features and behaviors to the drag and drop system through a consistent, composable API.
+
+## Plugin Class
+
+### Constructor
+
+Creates a new plugin instance.
+
+```typescript
+class MyPlugin extends Plugin<T, U> {
+  constructor(manager: T, options?: U) {
+    super(manager, options);
+  }
+}
+```
+
+<ParamField path="manager" type="T extends DragDropManager" required>
+  The drag and drop manager that owns this plugin.
+</ParamField>
+
+<ParamField path="options" type="U extends PluginOptions" optional>
+  Optional configuration for the plugin.
+</ParamField>
+
+<ParamField path="T" type="extends DragDropManager<any, any>" default="DragDropManager<any, any>">
+  Type parameter for the drag and drop manager.
+</ParamField>
+
+<ParamField path="U" type="extends PluginOptions" default="PluginOptions">
+  Type parameter for plugin options.
+</ParamField>
+
+## Properties
+
+### manager
+
+<ParamField path="manager" type="T" readonly>
+  The drag and drop manager instance that this plugin is bound to.
+
+  ```typescript
+  const manager = plugin.manager;
+  ```
+</ParamField>
+
+### options
+
+<ParamField path="options" type="U | undefined">
+  The configuration options for this plugin instance.
+
+  ```typescript
+  const options = plugin.options;
+  plugin.options = newOptions;
+  ```
+</ParamField>
+
+### disabled
+
+<ParamField path="disabled" type="boolean" reactive>
+  Whether the plugin instance is disabled.
+
+  ```typescript
+  plugin.disabled = true;
+  ```
+
+  This property is reactive and triggers effects when accessed or modified.
+</ParamField>
+
+## Methods
+
+### enable()
+
+Enables a disabled plugin instance.
+
+```typescript
+plugin.enable();
+```
+
+This method triggers effects when called.
+
+### disable()
+
+Disables an enabled plugin instance.
+
+```typescript
+plugin.disable();
+```
+
+This method triggers effects when called.
+
+### isDisabled()
+
+Checks if the plugin instance is disabled.
+
+```typescript
+const disabled = plugin.isDisabled();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if the plugin is disabled.
+</ResponseField>
+
+This method does not trigger effects when accessed.
+
+### configure()
+
+Configures a plugin instance with new options.
+
+```typescript
+plugin.configure({option: 'value'});
+```
+
+<ParamField path="options" type="U" optional>
+  The new options to apply.
+</ParamField>
+
+### destroy()
+
+Destroys a plugin instance and cleans up its resources.
+
+```typescript
+plugin.destroy();
+```
+
+This method:
+- Calls all registered cleanup functions
+- Should be overridden by subclasses to clean up additional resources
+
+### Protected Methods
+
+### registerEffect()
+
+Registers an effect that will be cleaned up when the plugin is destroyed.
+
+```typescript
+protected registerEffect(callback: () => void): () => void
+```
+
+<ParamField path="callback" type="() => void" required>
+  The effect callback to register. Should be bound to `this`.
+</ParamField>
+
+<ResponseField name="return" type="() => void">
+  A function to dispose of the effect.
+</ResponseField>
+
+## Static Methods
+
+### configure()
+
+Configures a plugin constructor with default options.
+
+```typescript
+const ConfiguredPlugin = MyPlugin.configure({
+  option1: 'value1',
+  option2: true
+});
+```
+
+<ParamField path="options" type="PluginOptions" required>
+  The options to configure the constructor with.
+</ParamField>
+
+<ResponseField name="return" type="PluginDescriptor">
+  A configured plugin descriptor that can be passed to the manager.
+</ResponseField>
+
+This method is used to configure the options that the plugin constructor will use to create plugin instances.
+
+## Types
+
+### PluginOptions
+
+Base type for plugin options.
+
+```typescript
+type PluginOptions = Record<string, any>;
+```
+
+### PluginConstructor
+
+Constructor type for creating plugin instances.
+
+```typescript
+interface PluginConstructor<
+  T extends DragDropManager<any, any> = DragDropManager<any, any>,
+  U extends Plugin<T> = Plugin<T>,
+  V extends PluginOptions = InferPluginOptions<U>
+> {
+  new (manager: T, options?: V): U;
+}
+```
+
+### PluginDescriptor
+
+Descriptor type for configuring plugins.
+
+```typescript
+type PluginDescriptor<
+  T extends DragDropManager<any, any> = DragDropManager<any, any>,
+  U extends Plugin<T> = Plugin<T>,
+  V extends PluginConstructor<T, U> = PluginConstructor<T, U>
+> = {
+  plugin: V;
+  options?: InferPluginOptions<U>;
+};
+```
+
+### Plugins
+
+Array type for multiple plugin configurations.
+
+```typescript
+type Plugins<T extends DragDropManager<any, any> = DragDropManager<any, any>> = 
+  (PluginConstructor<T> | PluginDescriptor<T>)[];
+```
+
+### InferPluginOptions
+
+Infers the options type from a plugin constructor or instance.
+
+```typescript
+type InferPluginOptions<P> =
+  P extends PluginConstructor<any, any, infer T> ? T :
+  P extends Plugin<any, infer T> ? T :
+  never;
+```
+
+### InferManager
+
+Infers the manager type from a plugin instance.
+
+```typescript
+type InferManager<P> =
+  P extends Plugin<infer T extends DragDropManager<any, any>> ? T : never;
+```
+
+## CorePlugin Class
+
+Base class for core plugins that ship with the library.
+
+```typescript
+class CorePlugin<
+  T extends DragDropManager<any, any> = DragDropManager<any, any>,
+  U extends PluginOptions = PluginOptions
+> extends Plugin<T, U> {}
+```
+
+Core plugins follow the same API as regular plugins but are marked as part of the library.
+
+## Utility Functions
+
+### configure()
+
+Utility function to create a plugin descriptor.
+
+```typescript
+import {configure} from '@dnd-kit/abstract';
+
+const descriptor = configure(MyPlugin, {option: 'value'});
+```
+
+<ParamField path="plugin" type="PluginConstructor" required>
+  The plugin constructor.
+</ParamField>
+
+<ParamField path="options" type="PluginOptions" required>
+  The options to configure with.
+</ParamField>
+
+<ResponseField name="return" type="PluginDescriptor">
+  A plugin descriptor.
+</ResponseField>
+
+### configurator()
+
+Utility function to create a plugin configurator.
+
+```typescript
+import {configurator} from '@dnd-kit/abstract';
+
+const configureMyPlugin = configurator(MyPlugin);
+const configured = configureMyPlugin({option: 'value'});
+```
+
+### descriptor()
+
+Utility function to extract plugin and options from a descriptor or constructor.
+
+```typescript
+import {descriptor} from '@dnd-kit/abstract';
+
+const {plugin, options} = descriptor(MyPlugin.configure({option: 'value'}));
+// or
+const {plugin, options} = descriptor(MyPlugin);
+```
+
+<ParamField path="entry" type="PluginConstructor | PluginDescriptor" required>
+  The plugin constructor or descriptor.
+</ParamField>
+
+<ResponseField name="return" type="{plugin: PluginConstructor, options?: PluginOptions}">
+  An object containing the plugin constructor and optional options.
+</ResponseField>
+
+## Implementing a Custom Plugin
+
+### Basic Implementation
+
+```typescript
+import {Plugin, type PluginOptions} from '@dnd-kit/abstract';
+import type {DragDropManager} from '@dnd-kit/abstract';
+
+interface MyPluginOptions extends PluginOptions {
+  debug?: boolean;
+}
+
+class MyPlugin extends Plugin<DragDropManager, MyPluginOptions> {
+  constructor(manager: DragDropManager, options?: MyPluginOptions) {
+    super(manager, options);
+    
+    // Register effects that should run while the plugin is active
+    this.registerEffect(() => {
+      if (this.options?.debug) {
+        console.log('Plugin activated');
+      }
+    });
+  }
+  
+  public destroy() {
+    if (this.options?.debug) {
+      console.log('Plugin destroyed');
+    }
+    super.destroy();
+  }
+}
+```
+
+### With Event Listeners
+
+```typescript
+import {Plugin} from '@dnd-kit/abstract';
+import type {DragDropManager, DragStartEvent} from '@dnd-kit/abstract';
+
+class EventListenerPlugin extends Plugin {
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    
+    // Register effect to add event listener
+    this.registerEffect(() => {
+      const handleDragStart = (event: DragStartEvent, manager: DragDropManager) => {
+        if (this.isDisabled()) return;
+        
+        console.log('Drag started:', event.operation.source?.id);
+      };
+      
+      // Add listener
+      const cleanup = this.manager.monitor.addEventListener(
+        'dragstart',
+        handleDragStart
+      );
+      
+      // Return cleanup function
+      return cleanup;
+    });
+  }
+}
+```
+
+### With State Management
+
+```typescript
+import {Plugin} from '@dnd-kit/abstract';
+import {reactive, effect} from '@dnd-kit/state';
+
+class StatefulPlugin extends Plugin {
+  @reactive
+  private accessor counter = 0;
+  
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      const cleanup = this.manager.monitor.addEventListener('dragmove', () => {
+        if (!this.isDisabled()) {
+          this.counter++;
+        }
+      });
+      
+      return cleanup;
+    });
+    
+    // React to counter changes
+    this.registerEffect(() => {
+      console.log('Move count:', this.counter);
+    });
+  }
+}
+```
+
+### Advanced Plugin with Multiple Features
+
+```typescript
+import {Plugin, type PluginOptions} from '@dnd-kit/abstract';
+import type {DragDropManager} from '@dnd-kit/abstract';
+
+interface AdvancedPluginOptions extends PluginOptions {
+  onDragStart?: (sourceId: string) => void;
+  onDragEnd?: (sourceId: string, targetId?: string) => void;
+  trackHistory?: boolean;
+}
+
+class AdvancedPlugin extends Plugin<DragDropManager, AdvancedPluginOptions> {
+  private history: Array<{source: string; target?: string}> = [];
+  
+  constructor(manager: DragDropManager, options?: AdvancedPluginOptions) {
+    super(manager, options);
+    
+    // Listen to drag start
+    this.registerEffect(() => {
+      return this.manager.monitor.addEventListener('dragstart', (event) => {
+        if (this.isDisabled()) return;
+        
+        const sourceId = event.operation.source?.id?.toString();
+        if (sourceId) {
+          this.options?.onDragStart?.(sourceId);
+        }
+      });
+    });
+    
+    // Listen to drag end
+    this.registerEffect(() => {
+      return this.manager.monitor.addEventListener('dragend', (event) => {
+        if (this.isDisabled()) return;
+        
+        const sourceId = event.operation.source?.id?.toString();
+        const targetId = event.operation.target?.id?.toString();
+        
+        if (sourceId) {
+          this.options?.onDragEnd?.(sourceId, targetId);
+          
+          if (this.options?.trackHistory) {
+            this.history.push({source: sourceId, target: targetId});
+          }
+        }
+      });
+    });
+  }
+  
+  public getHistory() {
+    return [...this.history];
+  }
+  
+  public clearHistory() {
+    this.history = [];
+  }
+  
+  public destroy() {
+    this.clearHistory();
+    super.destroy();
+  }
+}
+```
+
+## Usage Examples
+
+### Using Plugins with Manager
+
+```typescript
+import {DragDropManager} from '@dnd-kit/abstract';
+import {MyPlugin, AnotherPlugin} from './plugins';
+
+const manager = new DragDropManager({
+  plugins: [MyPlugin, AnotherPlugin]
+});
+```
+
+### Configuring Plugins
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [
+    MyPlugin.configure({
+      debug: true,
+      option: 'value'
+    }),
+    AnotherPlugin
+  ]
+});
+```
+
+### Per-Draggable Plugins
+
+```typescript
+import {Draggable} from '@dnd-kit/abstract';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    plugins: [MyPlugin.configure({option: 'value'})]
+  },
+  manager
+);
+```
+
+### Extending Defaults
+
+```typescript
+const manager = new DragDropManager({
+  plugins: (defaults) => [
+    ...defaults,
+    MyPlugin,
+    AnotherPlugin
+  ]
+});
+```
+
+### Dynamic Plugin Management
+
+```typescript
+const manager = new DragDropManager();
+
+// Add plugins later
+manager.plugins = [MyPlugin, AnotherPlugin];
+
+// Disable a plugin
+const myPlugin = manager.plugins.find(p => p instanceof MyPlugin);
+myPlugin?.disable();
+
+// Re-enable
+myPlugin?.enable();
+```
+
+### Accessing Plugin Configuration
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    plugins: [
+      MyPlugin.configure({option1: 'value1'})
+    ]
+  },
+  manager
+);
+
+// Get plugin config for this draggable
+const config = draggable.pluginConfig(MyPlugin);
+console.log(config); // {option1: 'value1'}
+```
+
+## Plugin Registry
+
+The `PluginRegistry` class manages plugin instances:
+
+```typescript
+class PluginRegistry {
+  // Get all registered plugins
+  get values(): Plugin[];
+  
+  // Set plugins (replaces existing)
+  set values(plugins: Plugins);
+  
+  // Register a plugin constructor
+  register(plugin: PluginConstructor): void;
+  
+  // Unregister a plugin constructor
+  unregister(plugin: PluginConstructor): void;
+}
+```
+
+Access via manager:
+
+```typescript
+const manager = new DragDropManager();
+
+// Get active plugins
+const plugins = manager.registry.plugins.values;
+
+// Register a plugin
+manager.registry.plugins.register(MyPlugin);
+```
+
+## Common Plugin Patterns
+
+### Logging Plugin
+
+```typescript
+class LoggingPlugin extends Plugin {
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      const events = ['dragstart', 'dragmove', 'dragover', 'dragend'] as const;
+      const cleanups = events.map(eventName => 
+        this.manager.monitor.addEventListener(eventName, (event) => {
+          if (!this.isDisabled()) {
+            console.log(`[${eventName}]`, event);
+          }
+        })
+      );
+      
+      return () => cleanups.forEach(cleanup => cleanup());
+    });
+  }
+}
+```
+
+### Analytics Plugin
+
+```typescript
+class AnalyticsPlugin extends Plugin {
+  private startTime?: number;
+  
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      return this.manager.monitor.addEventListener('dragstart', () => {
+        this.startTime = Date.now();
+      });
+    });
+    
+    this.registerEffect(() => {
+      return this.manager.monitor.addEventListener('dragend', (event) => {
+        if (this.startTime) {
+          const duration = Date.now() - this.startTime;
+          analytics.track('drag_completed', {
+            duration,
+            canceled: event.canceled,
+            sourceId: event.operation.source?.id,
+            targetId: event.operation.target?.id
+          });
+        }
+      });
+    });
+  }
+}
+```
+
+### Auto-Scroll Plugin
+
+```typescript
+class AutoScrollPlugin extends Plugin {
+  private rafId?: number;
+  
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      const handleDragMove = () => {
+        if (this.isDisabled()) return;
+        
+        this.rafId = requestAnimationFrame(() => {
+          // Auto-scroll logic
+          const {position} = this.manager.dragOperation;
+          const threshold = 50;
+          
+          if (position.current.y < threshold) {
+            window.scrollBy(0, -10);
+          } else if (window.innerHeight - position.current.y < threshold) {
+            window.scrollBy(0, 10);
+          }
+        });
+      };
+      
+      const cleanup = this.manager.monitor.addEventListener(
+        'dragmove',
+        handleDragMove
+      );
+      
+      return () => {
+        cleanup();
+        if (this.rafId) {
+          cancelAnimationFrame(this.rafId);
+        }
+      };
+    });
+  }
+}
+```
+
+## See Also
+
+- [DragDropManager](/api/abstract/drag-drop-manager) - Using plugins with the manager
+- [Sensors](/api/abstract/sensors) - Input handling plugins
+- [Modifiers](/api/abstract/modifiers) - Behavior transformation plugins
+- [Draggable](/api/abstract/draggable) - Per-entity plugin configuration

@@ -1,0 +1,444 @@
+---
+title: 'DragOverlay'
+description: 'Component that renders a custom overlay element during drag operations'
+---
+
+`DragOverlay` is a component that renders custom content during drag operations. It provides a visual representation of the dragged item that follows the cursor, separate from the original element.
+
+## Usage
+
+```tsx
+import {DragOverlay} from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Your draggable and droppable elements */}
+      
+      <DragOverlay>
+        <div style={{padding: '20px', background: 'white', border: '1px solid black'}}>
+          Dragging...
+        </div>
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+## Props
+
+<ParamField path="children" type="ReactNode | ((source: Draggable) => ReactNode)" required>
+  The content to render in the overlay. Can be a static React node or a function that receives the drag source and returns content.
+
+  ```tsx
+  // Static content
+  <DragOverlay>
+    <div>Dragging...</div>
+  </DragOverlay>
+
+  // Dynamic content based on drag source
+  <DragOverlay>
+    {(source) => (
+      <div>
+        Dragging: {source.data.label}
+      </div>
+    )}
+  </DragOverlay>
+  ```
+</ParamField>
+
+<ParamField path="dropAnimation" type="DropAnimation | null">
+  Customize or disable the drop animation that plays when a drag operation ends.
+
+  - `undefined` — Use the default animation (250ms ease)
+  - `null` — Disable the drop animation entirely
+  - `{duration, easing}` — Customize the animation timing
+  - `(context) => Promise<void> | void` — Provide a fully custom animation function
+
+  ```tsx
+  // Custom animation duration and easing
+  <DragOverlay
+    dropAnimation={{
+      duration: 300,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    }}
+  >
+    {children}
+  </DragOverlay>
+
+  // Disable animation
+  <DragOverlay dropAnimation={null}>
+    {children}
+  </DragOverlay>
+  ```
+</ParamField>
+
+<ParamField path="className" type="string">
+  CSS class name to apply to the overlay container element.
+
+  ```tsx
+  <DragOverlay className="drag-overlay">
+    {children}
+  </DragOverlay>
+  ```
+</ParamField>
+
+<ParamField path="style" type="React.CSSProperties">
+  Inline styles to apply to the overlay container element.
+
+  ```tsx
+  <DragOverlay
+    style={{
+      cursor: 'grabbing',
+      opacity: 0.9,
+    }}
+  >
+    {children}
+  </DragOverlay>
+  ```
+</ParamField>
+
+<ParamField path="tag" type="string" default="div">
+  HTML tag name for the overlay container element.
+
+  ```tsx
+  <DragOverlay tag="section">
+    {children}
+  </DragOverlay>
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean | ((source: Draggable | null) => boolean)">
+  Whether the overlay is disabled. Can be a boolean or a function that receives the drag source.
+
+  ```tsx
+  // Disable based on drag source
+  <DragOverlay disabled={(source) => source?.data.hideOverlay}>
+    {children}
+  </DragOverlay>
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Overlay
+
+```tsx
+import {DragDropProvider, useDraggable, DragOverlay} from '@dnd-kit/react';
+
+function App() {
+  return (
+    <DragDropProvider>
+      <div>
+        <DraggableItem id="item-1" label="Item 1" />
+        <DraggableItem id="item-2" label="Item 2" />
+      </div>
+
+      <DragOverlay>
+        <div
+          style={{
+            padding: '15px',
+            background: 'white',
+            border: '2px solid blue',
+            borderRadius: '4px',
+            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          Dragging...
+        </div>
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+
+function DraggableItem({id, label}) {
+  const {ref, isDragging} = useDraggable({id, data: {label}});
+  return (
+    <div ref={ref} style={{opacity: isDragging ? 0.3 : 1}}>
+      {label}
+    </div>
+  );
+}
+```
+
+### Dynamic Overlay Content
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      <div>
+        <DraggableItem id="1" label="First Item" color="#ff6b6b" />
+        <DraggableItem id="2" label="Second Item" color="#4ecdc4" />
+      </div>
+
+      <DragOverlay>
+        {(source) => (
+          <div
+            style={{
+              padding: '20px',
+              background: source.data.color,
+              color: 'white',
+              borderRadius: '8px',
+              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
+              fontWeight: 'bold',
+            }}
+          >
+            {source.data.label}
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+
+function DraggableItem({id, label, color}) {
+  const {ref, isDragging} = useDraggable({
+    id,
+    data: {label, color},
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '20px',
+        background: color,
+        opacity: isDragging ? 0.3 : 1,
+        marginBottom: '10px',
+      }}
+    >
+      {label}
+    </div>
+  );
+}
+```
+
+### Custom Drop Animation
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay
+        dropAnimation={{
+          duration: 500,
+          easing: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)', // Bounce effect
+        }}
+      >
+        {(source) => (
+          <div style={{padding: '20px', background: 'white'}}>
+            {source.data.label}
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+### Overlay with No Animation
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay dropAnimation={null}>
+        <div>Instant drop</div>
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+### Conditional Overlay
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay
+        disabled={(source) => {
+          // Hide overlay for items marked as 'no-overlay'
+          return source?.data.hideOverlay === true;
+        }}
+      >
+        {(source) => <div>{source.data.label}</div>}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+
+function DraggableItem({id, hideOverlay}) {
+  const {ref} = useDraggable({
+    id,
+    data: {hideOverlay},
+  });
+  return <div ref={ref}>Item {id}</div>;
+}
+```
+
+### Styled Overlay with Shadow
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay
+        className="drag-overlay"
+        style={{
+          cursor: 'grabbing',
+        }}
+      >
+        {(source) => (
+          <div
+            style={{
+              padding: '15px 20px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+              transform: 'rotate(-2deg)',
+              fontWeight: '600',
+            }}
+          >
+            {source.data.label}
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+### Multiple Overlays for Different Types
+
+```tsx
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items with different types */}
+      
+      {/* Overlay for 'file' type */}
+      <DragOverlay disabled={(source) => source?.data.type !== 'file'}>
+        {(source) => (
+          <div style={{padding: '10px', background: '#e3f2fd'}}>
+            📄 {source.data.name}
+          </div>
+        )}
+      </DragOverlay>
+
+      {/* Overlay for 'folder' type */}
+      <DragOverlay disabled={(source) => source?.data.type !== 'folder'}>
+        {(source) => (
+          <div style={{padding: '10px', background: '#fff3e0'}}>
+            📁 {source.data.name}
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+### Overlay with Item Count
+
+```tsx
+function App() {
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay>
+        {(source) => (
+          <div
+            style={{
+              padding: '15px',
+              background: 'white',
+              border: '2px solid #2196f3',
+              borderRadius: '8px',
+              position: 'relative',
+            }}
+          >
+            <div>{source.data.label}</div>
+            {selectedIds.includes(source.id) && selectedIds.length > 1 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  background: '#2196f3',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {selectedIds.length}
+              </div>
+            )}
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+## Type Safety
+
+Use TypeScript generics to type the drag source:
+
+```tsx
+interface ItemData {
+  label: string;
+  category: string;
+  icon: string;
+}
+
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Draggable items */}
+      
+      <DragOverlay<ItemData>>
+        {(source) => (
+          <div>
+            <span>{source.data.icon}</span>
+            <span>{source.data.label}</span>
+            <small>{source.data.category}</small>
+          </div>
+        )}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+## Behavior
+
+- The overlay is automatically positioned to follow the cursor during drag operations
+- Children inside the overlay cannot register themselves as draggables or droppables (the manager registry is patched)
+- The overlay element has a `data-dnd-overlay` attribute for styling purposes
+- When the overlay is disabled or there's no active drag, the overlay renders nothing
+
+## Related
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Context provider for drag and drop
+- [useDraggable](/api/react/use-draggable) — Make elements draggable
+- [Feedback Plugin](/api/plugins/feedback) — Built-in plugin that powers the overlay

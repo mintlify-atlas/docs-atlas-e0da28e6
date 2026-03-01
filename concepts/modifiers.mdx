@@ -1,0 +1,589 @@
+---
+title: Modifiers
+description: Transform drag coordinates to constrain movement, snap to grids, or implement custom behaviors
+---
+
+Modifiers transform the coordinates of a drag operation, enabling features like axis constraints, snap-to-grid, boundary restrictions, and custom transformations.
+
+## Overview
+
+Modifiers:
+
+- Transform drag coordinates before rendering
+- Run in a pipeline (each modifier receives the output of the previous)
+- Can be configured globally or per-draggable
+- Support options for customization
+- Are reactive and can be enabled/disabled dynamically
+
+## How modifiers work
+
+During a drag operation:
+
+1. User drags an element
+2. Sensor updates position
+3. Position delta is calculated: `{x: currentX - initialX, y: currentY - initialY}`
+4. Each modifier transforms the coordinates in sequence
+5. Final transform is applied for rendering
+
+```typescript
+// From dragOperation.ts
+get transform() {
+  const {x, y} = this.position.delta;
+  let transform = {x, y};
+  
+  for (const modifier of this.modifiers) {
+    transform = modifier.apply({
+      ...this.snapshot(),
+      transform,
+    });
+  }
+  
+  return transform;
+}
+```
+
+## Modifier base class
+
+All modifiers extend the `Modifier` base class:
+
+```typescript
+class Modifier<
+  T extends DragDropManager<any, any> = DragDropManager<any, any>,
+  U extends ModifierOptions = ModifierOptions
+> extends Plugin<T, U> {
+  constructor(
+    public manager: T,
+    public options?: U
+  );
+  
+  apply(operation: DragOperationSnapshot): Coordinates {
+    return operation.transform;
+  }
+}
+```
+
+Override the `apply` method to transform coordinates:
+
+```typescript
+class MyModifier extends Modifier {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    
+    // Transform coordinates
+    return {
+      x: /* modified x */,
+      y: /* modified y */,
+    };
+  }
+}
+```
+
+## Built-in modifiers
+
+### Axis constraints
+
+Restrict movement to a single axis:
+
+**Vertical axis:**
+
+```typescript
+import {RestrictToVerticalAxis} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [RestrictToVerticalAxis],
+});
+```
+
+Fixes x-coordinate to 0, allowing only vertical movement.
+
+**Horizontal axis:**
+
+```typescript
+import {RestrictToHorizontalAxis} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [RestrictToHorizontalAxis],
+});
+```
+
+Fixes y-coordinate to 0, allowing only horizontal movement.
+
+**Implementation:**
+
+```typescript
+// From abstract/src/modifiers/axis.ts
+class AxisModifier extends Modifier<DragDropManager, Options> {
+  apply({transform}: DragOperation) {
+    if (!this.options) return transform;
+    
+    const {axis, value} = this.options;
+    
+    return {
+      ...transform,
+      [axis]: value,
+    };
+  }
+}
+
+export const RestrictToVerticalAxis = AxisModifier.configure({
+  axis: 'x',
+  value: 0,
+});
+
+export const RestrictToHorizontalAxis = AxisModifier.configure({
+  axis: 'y',
+  value: 0,
+});
+```
+
+### Snap to grid
+
+Snap coordinates to a grid:
+
+```typescript
+import {SnapToGrid} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [
+    SnapToGrid.configure({gridSize: 20}),
+  ],
+});
+```
+
+**Implementation:**
+
+```typescript
+// From abstract/src/modifiers/snap.ts
+interface Options {
+  gridSize: number;
+}
+
+class SnapModifier extends Modifier<DragDropManager, Options> {
+  apply({transform}: DragOperation): Coordinates {
+    const {gridSize = 1} = this.options ?? {};
+    
+    return {
+      x: Math.round(transform.x / gridSize) * gridSize,
+      y: Math.round(transform.y / gridSize) * gridSize,
+    };
+  }
+}
+
+export const SnapToGrid = SnapModifier.configure;
+```
+
+### Bounding rectangle
+
+Constrain movement within a rectangle:
+
+```typescript
+import {BoundingRectangle} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [
+    BoundingRectangle.configure({
+      bounds: {x: 0, y: 0, width: 800, height: 600},
+    }),
+  ],
+});
+```
+
+**Implementation:**
+
+```typescript
+// From abstract/src/modifiers/boundingRectangle.ts
+interface Options {
+  bounds: Rectangle;
+}
+
+class BoundingRectangleModifier extends Modifier<DragDropManager, Options> {
+  apply(operation: DragOperation): Coordinates {
+    const {transform, shape} = operation;
+    const {bounds} = this.options ?? {};
+    
+    if (!bounds || !shape) return transform;
+    
+    const {current} = shape;
+    
+    return {
+      x: clamp(transform.x, bounds.left - current.left, bounds.right - current.right),
+      y: clamp(transform.y, bounds.top - current.top, bounds.bottom - current.bottom),
+    };
+  }
+}
+```
+
+### DOM-specific modifiers
+
+The `@dnd-kit/dom` package provides DOM-specific modifiers:
+
+**Restrict to window:**
+
+```typescript
+import {RestrictToWindow} from '@dnd-kit/dom/modifiers';
+
+const manager = new DragDropManager({
+  modifiers: [RestrictToWindow],
+});
+```
+
+Prevents dragged elements from leaving the viewport.
+
+**Restrict to element:**
+
+```typescript
+import {RestrictToElement} from '@dnd-kit/dom/modifiers';
+
+const manager = new DragDropManager({
+  modifiers: [
+    RestrictToElement.configure({
+      element: document.getElementById('container'),
+    }),
+  ],
+});
+```
+
+Constrains movement within a specific DOM element.
+
+## Configuration
+
+### Global modifiers
+
+Apply to all draggables:
+
+```typescript
+const manager = new DragDropManager({
+  modifiers: [
+    RestrictToVerticalAxis,
+    SnapToGrid.configure({gridSize: 20}),
+  ],
+});
+```
+
+### Per-draggable modifiers
+
+Override for specific draggables:
+
+```typescript
+import {RestrictToHorizontalAxis} from '@dnd-kit/abstract';
+
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  
+  // Only this draggable uses horizontal constraint
+  modifiers: [RestrictToHorizontalAxis],
+});
+```
+
+Per-draggable modifiers replace the manager's modifiers for that draggable.
+
+### Dynamic modifiers
+
+You can change modifiers during runtime:
+
+```typescript
+// Update manager modifiers
+manager.modifiers = [NewModifier];
+
+// Update per-draggable modifiers
+draggable.modifiers = [DifferentModifier];
+```
+
+The drag operation automatically updates to use the new modifiers.
+
+## Modifier pipeline
+
+Modifiers run in sequence, each receiving the output of the previous:
+
+```typescript
+const manager = new DragDropManager({
+  modifiers: [
+    SnapToGrid.configure({gridSize: 20}),  // First: snap to grid
+    RestrictToWindow,                       // Then: constrain to window
+  ],
+});
+```
+
+Order matters:
+
+```typescript
+// Snap, then constrain
+[SnapToGrid, RestrictToWindow]
+// Result: Snapped coordinates may be outside window, then clamped
+
+// Constrain, then snap
+[RestrictToWindow, SnapToGrid]
+// Result: Constrained coordinates, then snapped (may go outside again)
+```
+
+<Tip>
+Put general transforms (snap, scale) before boundary constraints (restrict to window/element) for best results.
+</Tip>
+
+## Custom modifiers
+
+Create custom modifiers for specific behaviors:
+
+### Simple example
+
+```typescript
+import {Modifier} from '@dnd-kit/abstract';
+import type {DragDropManager, DragOperationSnapshot} from '@dnd-kit/abstract';
+import type {Coordinates} from '@dnd-kit/geometry';
+
+class ScaleModifier extends Modifier<DragDropManager, {scale: number}> {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const {scale = 1} = this.options ?? {};
+    
+    return {
+      x: transform.x * scale,
+      y: transform.y * scale,
+    };
+  }
+}
+
+// Use it
+const manager = new DragDropManager({
+  modifiers: [
+    ScaleModifier.configure({scale: 0.5}),  // Half speed
+  ],
+});
+```
+
+### Momentum modifier
+
+```typescript
+class MomentumModifier extends Modifier {
+  #velocity = {x: 0, y: 0};
+  #lastTransform = {x: 0, y: 0};
+  
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    
+    // Calculate velocity
+    this.#velocity.x = transform.x - this.#lastTransform.x;
+    this.#velocity.y = transform.y - this.#lastTransform.y;
+    
+    this.#lastTransform = transform;
+    
+    // Apply momentum
+    return {
+      x: transform.x + this.#velocity.x * 0.1,
+      y: transform.y + this.#velocity.y * 0.1,
+    };
+  }
+  
+  destroy() {
+    this.#velocity = {x: 0, y: 0};
+    this.#lastTransform = {x: 0, y: 0};
+  }
+}
+```
+
+### Conditional modifier
+
+```typescript
+class ConditionalModifier extends Modifier<DragDropManager, {enabled: boolean}> {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const {enabled = true} = this.options ?? {};
+    
+    if (!enabled) return transform;
+    
+    // Apply transformation only when enabled
+    return {
+      x: Math.round(transform.x / 10) * 10,
+      y: Math.round(transform.y / 10) * 10,
+    };
+  }
+}
+
+// Toggle at runtime
+const modifier = new ConditionalModifier(manager, {enabled: false});
+manager.modifiers = [modifier];
+
+// Enable later
+modifier.configure({enabled: true});
+```
+
+## Operation snapshot
+
+Modifiers receive a snapshot of the current drag operation:
+
+```typescript
+interface DragOperationSnapshot {
+  activatorEvent: Event | null;      // Event that started the drag
+  canceled: boolean;                  // Whether drag was canceled
+  position: Position;                 // Current and initial position
+  transform: Coordinates;             // Current transform (from previous modifier)
+  status: Status;                     // Drag status
+  shape: WithHistory<Shape> | null;   // Draggable shape (current, initial, previous)
+  source: Draggable | null;           // Draggable being dragged
+  target: Droppable | null;           // Current drop target
+}
+```
+
+Use this data to make informed decisions:
+
+```typescript
+class SmartModifier extends Modifier {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform, target, shape} = operation;
+    
+    // Different behavior based on target
+    if (target) {
+      // Over a droppable: snap to grid
+      return {
+        x: Math.round(transform.x / 20) * 20,
+        y: Math.round(transform.y / 20) * 20,
+      };
+    }
+    
+    // Not over a droppable: free movement
+    return transform;
+  }
+}
+```
+
+## Lifecycle
+
+Modifiers follow the plugin lifecycle:
+
+```typescript
+class MyModifier extends Modifier {
+  constructor(manager: DragDropManager, options?: ModifierOptions) {
+    super(manager, options);
+    
+    // Set up effects
+    this.registerEffect(() => {
+      // React to drag operation changes
+    });
+  }
+  
+  apply(operation: DragOperationSnapshot): Coordinates {
+    // Transform coordinates
+    return operation.transform;
+  }
+  
+  destroy() {
+    // Clean up resources
+    super.destroy();
+  }
+}
+```
+
+### Enable/disable
+
+Modifiers can be enabled or disabled:
+
+```typescript
+const modifier = new MyModifier(manager);
+
+// Disable
+modifier.disable();
+
+// Enable
+modifier.enable();
+
+// Check status
+if (modifier.isDisabled()) {
+  // Modifier is disabled
+}
+```
+
+Disabled modifiers still run but can check their status:
+
+```typescript
+class MyModifier extends Modifier {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    if (this.isDisabled()) {
+      return operation.transform;  // Pass through
+    }
+    
+    // Apply transformation
+    return {/* ... */};
+  }
+}
+```
+
+## Combining modifiers
+
+You can create complex behaviors by combining modifiers:
+
+```typescript
+import {
+  RestrictToVerticalAxis,
+  SnapToGrid,
+  BoundingRectangle,
+} from '@dnd-kit/abstract';
+
+const manager = new DragDropManager({
+  modifiers: [
+    RestrictToVerticalAxis,        // Only vertical movement
+    SnapToGrid.configure({         // Snap to 20px grid
+      gridSize: 20,
+    }),
+    BoundingRectangle.configure({  // Stay within bounds
+      bounds: {x: 0, y: 0, width: 400, height: 800},
+    }),
+  ],
+});
+```
+
+Result: Vertical-only movement, snapped to 20px grid, constrained within bounds.
+
+## Performance
+
+<Info>
+Modifiers run on every position update during a drag. Keep them lightweight and avoid heavy computations.
+</Info>
+
+<Tip>
+Use memoization if your modifier performs expensive calculations:
+
+```typescript
+class ExpensiveModifier extends Modifier {
+  #cache = new Map();
+  
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    const key = `${transform.x},${transform.y}`;
+    
+    if (this.#cache.has(key)) {
+      return this.#cache.get(key)!;
+    }
+    
+    const result = /* expensive calculation */;
+    this.#cache.set(key, result);
+    return result;
+  }
+}
+```
+</Tip>
+
+## Best practices
+
+1. **Order matters**: Place general transforms before constraints
+2. **Keep it simple**: Modifiers run frequently, avoid complex logic
+3. **Use options**: Make modifiers configurable with options
+4. **Clean up**: Implement `destroy()` if you allocate resources
+5. **Test combinations**: Ensure modifiers work well together
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Modifiers API" icon="wand-magic-sparkles" href="/api/abstract/modifiers">
+    API reference
+  </Card>
+  <Card title="DOM modifiers" icon="code" href="/api/dom/plugins">
+    DOM-specific modifiers
+  </Card>
+  <Card title="Geometry" icon="ruler" href="/api/geometry/utilities">
+    Coordinate utilities
+  </Card>
+  <Card title="Plugins" icon="plug" href="/concepts/plugins">
+    Plugin system
+  </Card>
+</CardGroup>

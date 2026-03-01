@@ -1,0 +1,106 @@
+---
+title: '@dnd-kit/react'
+description: 'React adapter for dnd-kit — a lightweight, performant, and extensible drag and drop toolkit'
+---
+
+The React adapter for dnd-kit provides React-specific hooks and components built on top of `@dnd-kit/dom`. It enables you to create drag and drop interfaces with a declarative API that integrates seamlessly with React's component model.
+
+## Installation
+
+Install the package using your preferred package manager:
+
+```bash
+npm install @dnd-kit/react
+```
+
+## Quick Start
+
+Create a basic drag and drop interface:
+
+```tsx
+import {DragDropProvider, useDraggable, useDroppable} from '@dnd-kit/react';
+import {useState} from 'react';
+
+function App() {
+  const [parent, setParent] = useState(null);
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        if (event.canceled) return;
+        setParent(event.operation.target?.id ?? null);
+      }}
+    >
+      {parent == null ? <Draggable /> : null}
+      <Droppable>{parent ? <Draggable /> : 'Drop here'}</Droppable>
+    </DragDropProvider>
+  );
+}
+
+function Draggable() {
+  const {ref} = useDraggable({id: 'draggable'});
+  return <div ref={ref}>Drag me</div>;
+}
+
+function Droppable({children}) {
+  const {ref} = useDroppable({id: 'droppable'});
+  return <div ref={ref}>{children}</div>;
+}
+```
+
+## Core Exports
+
+### Components
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Wraps your drag and drop interface, manages sensors, plugins, and events
+- [DragOverlay](/api/react/drag-overlay) — Renders a custom overlay element during drag operations
+
+### Hooks
+
+- [useDraggable](/api/react/use-draggable) — Make an element draggable
+- [useDroppable](/api/react/use-droppable) — Create a drop target
+- [useSortable](/api/react/use-sortable) — Combine drag and drop with sorting
+- [useDragDropManager](/api/react/hooks#usedragdropmanager) — Access the drag and drop manager instance
+- [useDragDropMonitor](/api/react/hooks#usedragdropmonitor) — Monitor drag and drop events
+- [useDragOperation](/api/react/hooks#usedragoperation) — Access the current drag operation state
+
+## Type Safety
+
+All hooks and components support custom data types through TypeScript generics:
+
+```tsx
+interface MyData {
+  label: string;
+  value: number;
+}
+
+const {ref} = useDraggable<MyData>({
+  id: 'item',
+  data: {label: 'Item 1', value: 42},
+});
+```
+
+## Features
+
+- **Declarative API** — Use hooks and components to define drag and drop behavior
+- **Fine-grained reactivity** — Automatic re-renders only when necessary
+- **TypeScript support** — Full type safety with generics
+- **Server-side rendering** — Compatible with Next.js and other SSR frameworks
+- **Modular architecture** — Import only what you need
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DragDropProvider" icon="layer-group" href="/api/react/drag-drop-provider">
+    Set up your drag and drop context
+  </Card>
+  <Card title="useDraggable" icon="hand-pointer" href="/api/react/use-draggable">
+    Make elements draggable
+  </Card>
+  <Card title="useDroppable" icon="bullseye" href="/api/react/use-droppable">
+    Create drop targets
+  </Card>
+  <Card title="useSortable" icon="arrows-up-down" href="/api/react/use-sortable">
+    Build sortable lists
+  </Card>
+</CardGroup>

@@ -1,0 +1,516 @@
+---
+title: "Sortable"
+description: "High-level API for building sortable lists and grids"
+---
+
+## Overview
+
+The `Sortable` class combines `Draggable` and `Droppable` functionality to create sortable lists, grids, and other reorderable collections. It handles index tracking, smooth transitions, and optimistic updates automatically.
+
+## Installation
+
+```typescript
+import { Sortable } from '@dnd-kit/dom/sortable';
+```
+
+## Constructor
+
+```typescript
+const sortable = new Sortable(input, manager);
+```
+
+### Parameters
+
+<ParamField path="input" type="SortableInput" required>
+  Configuration for the sortable item
+
+  <Expandable title="properties">
+    <ParamField path="id" type="UniqueIdentifier" required>
+      Unique identifier for this sortable item
+    </ParamField>
+
+    <ParamField path="index" type="number" required>
+      Current index within the sortable group
+    </ParamField>
+
+    <ParamField path="element" type="Element" required>
+      The DOM element to make sortable
+    </ParamField>
+
+    <ParamField path="group" type="UniqueIdentifier" optional>
+      Group identifier for multi-list sorting.
+      
+      Items in the same group can be sorted together. Items without a group can only sort within their own list.
+    </ParamField>
+
+    <ParamField path="target" type="Element" optional>
+      The element to use as the droppable target.
+      
+      By default, uses the same element. Useful for drop zones that differ from the visual element.
+    </ParamField>
+
+    <ParamField path="transition" type="SortableTransition | null" optional>
+      Transition configuration for position changes.
+      
+      ```typescript
+      transition: {
+        duration: 250,                            // Milliseconds
+        easing: 'cubic-bezier(0.25, 1, 0.5, 1)', // CSS easing
+        idle: false                               // Animate when not dragging?
+      }
+      ```
+      
+      Set to `null` to disable transitions.
+    </ParamField>
+
+    <ParamField path="plugins" type="Plugins" optional>
+      Plugins specific to this sortable item.
+      
+      Default includes `SortableKeyboardPlugin` and `OptimisticSortingPlugin`.
+    </ParamField>
+
+    <ParamField path="data" type="T" optional>
+      Custom data attached to this sortable
+    </ParamField>
+
+    <ParamField path="handle" type="Element" optional>
+      Drag handle element. If not provided, the entire element is draggable.
+    </ParamField>
+
+    <ParamField path="disabled" type="boolean" optional>
+      Whether this sortable is disabled
+    </ParamField>
+
+    <ParamField path="type" type="Type" optional>
+      Type identifier for filtering drag-drop interactions
+    </ParamField>
+
+    <ParamField path="accept" type="Type | Type[] | (draggable) => boolean" optional>
+      Types this sortable accepts as drop targets.
+      
+      ```typescript
+      accept: 'item'              // Single type
+      accept: ['item', 'card']   // Multiple types
+      accept: (draggable) => {...} // Function
+      ```
+    </ParamField>
+
+    <ParamField path="sensors" type="Sensors" optional>
+      Override sensors for this sortable
+    </ParamField>
+
+    <ParamField path="modifiers" type="Modifiers" optional>
+      Position modifiers for this sortable
+    </ParamField>
+
+    <ParamField path="collisionDetector" type="CollisionDetector" optional>
+      Custom collision detection algorithm
+    </ParamField>
+
+    <ParamField path="collisionPriority" type="number" optional>
+      Priority for collision resolution. Higher values win.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="manager" type="DragDropManager" required>
+  The DragDropManager instance
+</ParamField>
+
+## Properties
+
+### index
+
+```typescript
+sortable.index = 2;
+console.log(sortable.index); // 2
+```
+
+Current index within the sortable group. Updating this triggers a transition animation.
+
+### initialIndex
+
+```typescript
+console.log(sortable.initialIndex); // Index when drag started
+```
+
+The index when the current drag operation started. Read-only.
+
+### group
+
+```typescript
+sortable.group = 'list-1';
+console.log(sortable.group); // 'list-1'
+```
+
+Group identifier. Items in the same group can be sorted together.
+
+### initialGroup
+
+```typescript
+console.log(sortable.initialGroup); // Group when drag started
+```
+
+The group when the current drag operation started. Read-only.
+
+### element
+
+```typescript
+sortable.element = document.getElementById('item-1');
+```
+
+The sortable's DOM element.
+
+### target
+
+```typescript
+sortable.target = document.getElementById('drop-zone-1');
+```
+
+The droppable target element. Defaults to `element`.
+
+### isDragSource
+
+```typescript
+if (sortable.isDragSource) {
+  console.log('This item is being dragged');
+}
+```
+
+Whether this sortable is the source of the current drag. Read-only.
+
+### isDragging
+
+```typescript
+if (sortable.isDragging) {
+  console.log('This item is being dragged');
+}
+```
+
+Whether this sortable is currently being dragged. Read-only.
+
+### isDropTarget
+
+```typescript
+if (sortable.isDropTarget) {
+  console.log('Something is being dragged over this item');
+}
+```
+
+Whether something is being dragged over this sortable. Read-only.
+
+### disabled
+
+```typescript
+sortable.disabled = true;
+```
+
+Disable both dragging and dropping for this sortable.
+
+## Methods
+
+### register()
+
+```typescript
+const unregister = sortable.register();
+
+// Later...
+unregister();
+```
+
+Register the sortable with the manager. Returns a function to unregister.
+
+### unregister()
+
+```typescript
+sortable.unregister();
+```
+
+Unregister the sortable from the manager.
+
+### destroy()
+
+```typescript
+sortable.destroy();
+```
+
+Destroy the sortable and clean up resources.
+
+### refreshShape()
+
+```typescript
+sortable.refreshShape();
+```
+
+Refresh the sortable's bounding rectangle. Useful after layout changes.
+
+## Default Transition
+
+```typescript
+const defaultSortableTransition: SortableTransition = {
+  duration: 250,                           // Milliseconds
+  easing: 'cubic-bezier(0.25, 1, 0.5, 1)', // Smooth easing
+  idle: false                               // Don't animate when not dragging
+};
+```
+
+## Basic Example
+
+```typescript
+import { DragDropManager } from '@dnd-kit/dom';
+import { Sortable } from '@dnd-kit/dom/sortable';
+
+const manager = new DragDropManager();
+
+const items = ['Item 1', 'Item 2', 'Item 3'];
+const sortables: Sortable[] = [];
+
+items.forEach((item, index) => {
+  const element = document.getElementById(`item-${index}`);
+  
+  const sortable = new Sortable(
+    {
+      id: `item-${index}`,
+      index,
+      element
+    },
+    manager
+  );
+  
+  sortable.register();
+  sortables.push(sortable);
+});
+
+// Update indices on dragend
+manager.monitor.addEventListener('dragend', (event) => {
+  if (!event.target) return;
+  
+  // Reorder logic here
+  const oldIndex = event.source.index;
+  const newIndex = event.target.index;
+  
+  // Update your data model
+  const [removed] = items.splice(oldIndex, 1);
+  items.splice(newIndex, 0, removed);
+  
+  // Update sortable indices
+  sortables.forEach((sortable, i) => {
+    sortable.index = i;
+  });
+});
+```
+
+## Multi-List Example
+
+```typescript
+import { DragDropManager } from '@dnd-kit/dom';
+import { Sortable } from '@dnd-kit/dom/sortable';
+
+const manager = new DragDropManager();
+
+const lists = {
+  'list-1': ['A', 'B', 'C'],
+  'list-2': ['D', 'E', 'F']
+};
+
+const sortables = new Map<string, Sortable>();
+
+Object.entries(lists).forEach(([listId, items]) => {
+  items.forEach((item, index) => {
+    const element = document.getElementById(`${listId}-item-${index}`);
+    
+    const sortable = new Sortable(
+      {
+        id: `${listId}-${index}`,
+        index,
+        group: listId,  // Items in same group can sort together
+        element,
+        accept: 'sortable-item', // Accept any sortable item
+        type: 'sortable-item'
+      },
+      manager
+    );
+    
+    sortable.register();
+    sortables.set(sortable.id, sortable);
+  });
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  if (!event.target) return;
+  
+  const source = event.source as Sortable;
+  const target = event.target as Sortable;
+  
+  const sourceList = source.initialGroup;
+  const targetList = target.group;
+  
+  // Same list reorder
+  if (sourceList === targetList) {
+    const items = lists[sourceList];
+    const [removed] = items.splice(source.initialIndex, 1);
+    items.splice(target.index, 0, removed);
+  }
+  // Cross-list move
+  else {
+    const sourceItems = lists[sourceList];
+    const targetItems = lists[targetList];
+    const [removed] = sourceItems.splice(source.initialIndex, 1);
+    targetItems.splice(target.index, 0, removed);
+  }
+  
+  // Update all indices
+  Object.entries(lists).forEach(([listId, items]) => {
+    items.forEach((item, index) => {
+      const sortable = sortables.get(`${listId}-${index}`);
+      if (sortable) {
+        sortable.index = index;
+        sortable.group = listId;
+      }
+    });
+  });
+});
+```
+
+## Grid Example
+
+```typescript
+import { DragDropManager } from '@dnd-kit/dom';
+import { Sortable } from '@dnd-kit/dom/sortable';
+
+const manager = new DragDropManager();
+
+const GRID_COLS = 4;
+const items = Array.from({ length: 12 }, (_, i) => `Item ${i + 1}`);
+
+const sortables = items.map((item, index) => {
+  const element = document.getElementById(`grid-item-${index}`);
+  
+  const sortable = new Sortable(
+    {
+      id: `grid-${index}`,
+      index,
+      element,
+      transition: {
+        duration: 200,
+        easing: 'ease-out'
+      }
+    },
+    manager
+  );
+  
+  sortable.register();
+  return sortable;
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  if (!event.target) return;
+  
+  const oldIndex = event.source.index;
+  const newIndex = event.target.index;
+  
+  // Reorder items
+  const [removed] = items.splice(oldIndex, 1);
+  items.splice(newIndex, 0, removed);
+  
+  // Update all indices
+  sortables.forEach((sortable, i) => {
+    sortable.index = i;
+  });
+});
+```
+
+## Custom Transitions
+
+```typescript
+const sortable = new Sortable(
+  {
+    id: 'item-1',
+    index: 0,
+    element: document.getElementById('item-1'),
+    transition: {
+      duration: 300,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      idle: true  // Animate even when not dragging
+    }
+  },
+  manager
+);
+
+// Or disable transitions
+const sortableNoTransition = new Sortable(
+  {
+    id: 'item-2',
+    index: 1,
+    element: document.getElementById('item-2'),
+    transition: null  // No animation
+  },
+  manager
+);
+```
+
+## Built-in Plugins
+
+Sortable includes two plugins by default:
+
+### SortableKeyboardPlugin
+
+Enhances keyboard navigation for sortable lists:
+- Up/Down arrow keys move between items
+- Automatically reorders on arrow key press
+- Works with screen readers
+
+### OptimisticSortingPlugin
+
+Provides optimistic updates during dragging:
+- Items animate to their new positions before drop
+- Smooth reordering as you drag over items
+- Automatically reverts if drag is canceled
+
+## Type Definitions
+
+```typescript
+interface SortableInput<T extends Data>
+  extends DraggableInput<T>, DroppableInput<T> {
+  index: number;
+  target?: Element;
+  group?: UniqueIdentifier;
+  transition?: SortableTransition | null;
+  plugins?: Plugins;
+}
+
+interface SortableTransition {
+  duration?: number;
+  easing?: string;
+  idle?: boolean;
+}
+
+class Sortable<T extends Data = Data> {
+  constructor(input: SortableInput<T>, manager: DragDropManager);
+  
+  index: number;
+  readonly initialIndex: number;
+  group: UniqueIdentifier | undefined;
+  readonly initialGroup: UniqueIdentifier | undefined;
+  
+  element: Element | undefined;
+  target: Element | undefined;
+  
+  readonly isDragSource: boolean;
+  readonly isDragging: boolean;
+  readonly isDropTarget: boolean;
+  
+  disabled: boolean;
+  
+  register(): () => void;
+  unregister(): void;
+  destroy(): void;
+  refreshShape(): Rectangle | undefined;
+}
+```
+
+## Related
+
+- [DragDropManager](/api/dom/drag-drop-manager) - Configure the manager
+- [Plugins](/api/dom/plugins) - Visual feedback and transitions
+- [Sensors](/api/dom/sensors) - Input handling

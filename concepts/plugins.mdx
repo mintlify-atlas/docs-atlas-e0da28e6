@@ -1,0 +1,735 @@
+---
+title: Plugin system
+description: Extend dnd-kit functionality with plugins that add features like visual feedback, auto-scrolling, and accessibility
+---
+
+Plugins extend the core drag and drop functionality by adding features like visual feedback, auto-scrolling, accessibility announcements, and custom behaviors.
+
+## Overview
+
+Plugins:
+
+- Extend drag and drop behavior without modifying core code
+- React to drag operation changes through effects
+- Can be configured globally or per-draggable
+- Support options for customization
+- Can be enabled/disabled dynamically
+- Follow a consistent lifecycle
+
+## Plugin base class
+
+All plugins extend the `Plugin` base class:
+
+```typescript
+abstract class Plugin<
+  T extends DragDropManager<any, any> = DragDropManager<any, any>,
+  U extends PluginOptions = PluginOptions
+> {
+  constructor(
+    public manager: T,
+    public options?: U
+  );
+  
+  disabled: boolean;
+  
+  enable(): void;
+  disable(): void;
+  isDisabled(): boolean;
+  configure(options?: U): void;
+  
+  protected registerEffect(callback: () => void): () => void;
+  
+  destroy(): void;
+  
+  static configure(options: PluginOptions): PluginDescriptor;
+}
+```
+
+## Built-in plugins
+
+The `@dnd-kit/dom` package includes several useful plugins:
+
+### Feedback
+
+Provides visual feedback during drag operations:
+
+```typescript
+import {Feedback} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [Feedback],
+});
+```
+
+The feedback plugin:
+
+- Creates a visual representation of the dragged element
+- Follows the pointer during drag
+- Supports custom rendering
+- Handles animations and transitions
+
+**Configuration:**
+
+```typescript
+Feedback.configure({
+  duration: 300,        // Animation duration
+  disabled: false,      // Enable/disable
+})
+```
+
+### Accessibility
+
+Provides screen reader announcements:
+
+```typescript
+import {Accessibility} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [Accessibility],
+});
+```
+
+Announces:
+
+- When a drag starts
+- When hovering over a droppable
+- When a drag ends (dropped or canceled)
+
+### AutoScroller
+
+Automatically scrolls containers when dragging near edges:
+
+```typescript
+import {AutoScroller} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [AutoScroller],
+});
+```
+
+**Configuration:**
+
+```typescript
+AutoScroller.configure({
+  threshold: 50,        // Distance from edge to trigger
+  speed: 10,            // Scroll speed
+})
+```
+
+### Cursor
+
+Manages cursor styles during drag:
+
+```typescript
+import {Cursor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [Cursor],
+});
+```
+
+Sets appropriate cursors:
+
+- `grabbing` while dragging
+- `grab` on hover
+- `not-allowed` when can't drop
+
+### PreventSelection
+
+Prevents text selection during drag:
+
+```typescript
+import {PreventSelection} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [PreventSelection],
+});
+```
+
+This plugin is included by default and prevents unwanted text selection.
+
+## Core plugins
+
+Some plugins are required for core functionality:
+
+### CollisionNotifier
+
+Updates the drag target based on collision detection:
+
+```typescript
+// From collision/notifier.ts
+class CollisionNotifier extends CorePlugin {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      const collisions = this.manager.collisionObserver.collisions;
+      const collision = collisions[0];  // Highest priority
+      
+      this.manager.dragOperation.targetIdentifier = 
+        collision?.id ?? null;
+    });
+  }
+}
+```
+
+This plugin is automatically included in every manager.
+
+### ScrollListener & Scroller
+
+These DOM-specific plugins track and manage scroll offsets:
+
+```typescript
+// Automatically included in @dnd-kit/dom
+plugins: [ScrollListener, Scroller, StyleInjector, ...userPlugins]
+```
+
+## Creating custom plugins
+
+Extend the `Plugin` class to create custom functionality:
+
+### Basic example
+
+```typescript
+import {Plugin} from '@dnd-kit/abstract';
+import type {DragDropManager} from '@dnd-kit/abstract';
+
+class LoggerPlugin extends Plugin<DragDropManager> {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    // React to drag operation changes
+    this.registerEffect(() => {
+      const {status} = this.manager.dragOperation;
+      
+      if (status.dragging) {
+        console.log('Drag started');
+      }
+      
+      if (status.idle) {
+        console.log('Drag ended');
+      }
+    });
+  }
+}
+
+// Use it
+const manager = new DragDropManager({
+  plugins: [LoggerPlugin],
+});
+```
+
+### With options
+
+```typescript
+interface LoggerOptions {
+  prefix?: string;
+  verbose?: boolean;
+}
+
+class LoggerPlugin extends Plugin<DragDropManager, LoggerOptions> {
+  constructor(manager: DragDropManager, options?: LoggerOptions) {
+    super(manager, options);
+    
+    const {prefix = '[DnD]', verbose = false} = options ?? {};
+    
+    this.registerEffect(() => {
+      const {status, source, target} = this.manager.dragOperation;
+      
+      if (status.dragging) {
+        console.log(`${prefix} Started dragging:`, source?.id);
+        
+        if (verbose) {
+          console.log(`${prefix} Source data:`, source?.data);
+        }
+      }
+      
+      if (status.dropping && target) {
+        console.log(`${prefix} Dropping on:`, target.id);
+      }
+    });
+  }
+}
+
+// Configure and use
+const manager = new DragDropManager({
+  plugins: [
+    LoggerPlugin.configure({
+      prefix: '[MyApp]',
+      verbose: true,
+    }),
+  ],
+});
+```
+
+### Analytics plugin
+
+```typescript
+interface AnalyticsOptions {
+  trackingId: string;
+}
+
+class AnalyticsPlugin extends Plugin<DragDropManager, AnalyticsOptions> {
+  #startTime: number | null = null;
+  
+  constructor(manager: DragDropManager, options?: AnalyticsOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      const {status, source, target} = this.manager.dragOperation;
+      
+      if (status.dragging && !this.#startTime) {
+        this.#startTime = Date.now();
+        
+        this.track('drag_start', {
+          source_id: source?.id,
+          source_type: source?.type,
+        });
+      }
+      
+      if (status.idle && this.#startTime) {
+        const duration = Date.now() - this.#startTime;
+        
+        this.track('drag_end', {
+          source_id: source?.id,
+          target_id: target?.id,
+          duration_ms: duration,
+          canceled: this.manager.dragOperation.canceled,
+        });
+        
+        this.#startTime = null;
+      }
+    });
+  }
+  
+  private track(event: string, data: Record<string, any>) {
+    const {trackingId} = this.options ?? {};
+    
+    // Send to analytics service
+    console.log('Analytics:', event, {trackingId, ...data});
+  }
+  
+  destroy() {
+    this.#startTime = null;
+    super.destroy();
+  }
+}
+```
+
+### Visual feedback plugin
+
+```typescript
+class HighlightPlugin extends Plugin<DragDropManager> {
+  #cleanup: (() => void) | null = null;
+  
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      const {target} = this.manager.dragOperation;
+      
+      // Clean up previous highlight
+      this.#cleanup?.();
+      this.#cleanup = null;
+      
+      if (target?.element) {
+        // Add highlight class
+        target.element.classList.add('drop-target');
+        
+        this.#cleanup = () => {
+          target.element?.classList.remove('drop-target');
+        };
+      }
+    });
+  }
+  
+  destroy() {
+    this.#cleanup?.();
+    super.destroy();
+  }
+}
+```
+
+## Plugin lifecycle
+
+### Construction
+
+Plugins are instantiated when registered with the manager:
+
+```typescript
+// Manager creates plugin instances
+const plugin = new MyPlugin(manager, options);
+```
+
+### Effects
+
+Use `registerEffect` to react to drag operation changes:
+
+```typescript
+class MyPlugin extends Plugin {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    // This effect runs whenever reactive values change
+    this.registerEffect(() => {
+      const {status} = this.manager.dragOperation;
+      
+      // React to status changes
+      console.log('Status:', status);
+    });
+    
+    // Multiple effects are allowed
+    this.registerEffect(() => {
+      const {target} = this.manager.dragOperation;
+      
+      // React to target changes
+      console.log('Target:', target?.id);
+    });
+  }
+}
+```
+
+### Destruction
+
+Plugins are destroyed when the manager is destroyed:
+
+```typescript
+class MyPlugin extends Plugin {
+  #intervalId: number | null = null;
+  
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.#intervalId = setInterval(() => {
+      console.log('Tick');
+    }, 1000);
+  }
+  
+  destroy() {
+    // Clean up resources
+    if (this.#intervalId !== null) {
+      clearInterval(this.#intervalId);
+      this.#intervalId = null;
+    }
+    
+    // Call parent destroy (cleans up effects)
+    super.destroy();
+  }
+}
+```
+
+## Configuration
+
+### Global plugins
+
+Apply to all drag operations:
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [
+    Feedback,
+    Accessibility,
+    MyCustomPlugin.configure({/* options */}),
+  ],
+});
+```
+
+### Per-draggable plugins
+
+Apply to specific draggables:
+
+```typescript
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  
+  plugins: [
+    MyPlugin.configure({/* options */}),
+  ],
+});
+```
+
+Per-draggable plugins are registered with the manager when the draggable is registered.
+
+### Plugin descriptors
+
+The `configure` method returns a descriptor:
+
+```typescript
+type PluginDescriptor = {
+  plugin: PluginConstructor;
+  options: PluginOptions;
+};
+
+// Creating a descriptor
+const descriptor = MyPlugin.configure({option: 'value'});
+
+// Descriptor contains:
+// {
+//   plugin: MyPlugin,
+//   options: {option: 'value'}
+// }
+```
+
+Managers and entities accept both constructors and descriptors:
+
+```typescript
+// Constructor (uses default options)
+plugins: [MyPlugin]
+
+// Descriptor (uses custom options)
+plugins: [MyPlugin.configure({option: 'value'})]
+```
+
+## Enable/disable plugins
+
+Plugins can be enabled or disabled at runtime:
+
+```typescript
+const plugin = new MyPlugin(manager);
+
+// Disable
+plugin.disable();
+
+// Enable
+plugin.enable();
+
+// Check
+if (plugin.isDisabled()) {
+  // Plugin is disabled
+}
+```
+
+Disabled plugins:
+
+- Still exist in the registry
+- Effects still run
+- Should check `isDisabled()` and skip their logic
+
+```typescript
+class MyPlugin extends Plugin {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      if (this.isDisabled()) return;
+      
+      // Only run when enabled
+      const {status} = this.manager.dragOperation;
+      console.log('Status:', status);
+    });
+  }
+}
+```
+
+## Accessing plugins
+
+Get registered plugins from the manager:
+
+```typescript
+const {plugins} = manager;
+
+// Find a specific plugin
+const feedbackPlugin = plugins.find(
+  (p) => p instanceof Feedback
+);
+
+// Configure at runtime
+if (feedbackPlugin) {
+  feedbackPlugin.configure({duration: 500});
+}
+```
+
+## Plugin registry
+
+The manager maintains a plugin registry:
+
+```typescript
+manager.registry.plugins.values  // Get all plugin instances
+manager.plugins                  // Shorthand for registry.plugins.values
+```
+
+Set plugins:
+
+```typescript
+manager.plugins = [NewPlugin];
+```
+
+## Per-draggable plugin configuration
+
+Draggables can look up their plugin configuration:
+
+```typescript
+class MyPlugin extends Plugin {
+  constructor(manager: DragDropManager) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      const {source} = this.manager.dragOperation;
+      
+      if (source) {
+        // Get per-draggable options for this plugin
+        const options = source.pluginConfig(MyPlugin);
+        
+        if (options) {
+          console.log('Per-draggable options:', options);
+        }
+      }
+    });
+  }
+}
+```
+
+Usage:
+
+```typescript
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  plugins: [
+    MyPlugin.configure({customOption: 'value'}),
+  ],
+});
+
+// Later, in the plugin:
+const options = draggable.pluginConfig(MyPlugin);
+// Returns: {customOption: 'value'}
+```
+
+## Type safety
+
+Plugins can be typed with their manager type:
+
+```typescript
+class MyPlugin<T extends DragDropManager<any, any>> extends Plugin<T> {
+  constructor(manager: T, options?: MyOptions) {
+    super(manager, options);
+    
+    // manager is typed as T
+    this.registerEffect(() => {
+      // Type-safe access
+    });
+  }
+}
+```
+
+Infer types from manager:
+
+```typescript
+import type {InferDraggable, InferDroppable} from '@dnd-kit/abstract';
+
+class MyPlugin<T extends DragDropManager<any, any>> extends Plugin<T> {
+  constructor(manager: T) {
+    super(manager);
+    
+    this.registerEffect(() => {
+      const {source} = this.manager.dragOperation;
+      
+      // Type is inferred from manager
+      type Draggable = InferDraggable<T>;
+      const typedSource: Draggable | null = source;
+    });
+  }
+}
+```
+
+## Best practices
+
+<Tip>
+**Use effects for reactions**: Always use `registerEffect` to react to drag operation changes. This ensures your plugin stays in sync with the reactive system.
+</Tip>
+
+<Warning>
+**Clean up resources**: Implement `destroy()` if your plugin allocates resources (timers, event listeners, DOM elements).
+</Warning>
+
+<Info>
+**Support options**: Make your plugins configurable with options. Use the `configure` pattern for user-friendly configuration.
+</Info>
+
+<Tip>
+**Respect disabled state**: Check `isDisabled()` in your effects and skip logic when disabled.
+</Tip>
+
+## Example: Undo/Redo plugin
+
+```typescript
+interface UndoRedoOptions {
+  maxHistory?: number;
+}
+
+class UndoRedoPlugin extends Plugin<DragDropManager, UndoRedoOptions> {
+  #history: Array<{source: string, target: string}> = [];
+  #index = -1;
+  
+  constructor(manager: DragDropManager, options?: UndoRedoOptions) {
+    super(manager, options);
+    
+    this.registerEffect(() => {
+      const {status, source, target} = this.manager.dragOperation;
+      
+      if (status.idle && source && target && !this.manager.dragOperation.canceled) {
+        // Record successful drop
+        const {maxHistory = 50} = this.options ?? {};
+        
+        // Remove any future history
+        this.#history = this.#history.slice(0, this.#index + 1);
+        
+        // Add new entry
+        this.#history.push({
+          source: source.id.toString(),
+          target: target.id.toString(),
+        });
+        
+        // Limit history size
+        if (this.#history.length > maxHistory) {
+          this.#history.shift();
+        } else {
+          this.#index++;
+        }
+      }
+    });
+  }
+  
+  undo() {
+    if (this.#index < 0) return null;
+    
+    const action = this.#history[this.#index];
+    this.#index--;
+    return action;
+  }
+  
+  redo() {
+    if (this.#index >= this.#history.length - 1) return null;
+    
+    this.#index++;
+    const action = this.#history[this.#index];
+    return action;
+  }
+  
+  canUndo() {
+    return this.#index >= 0;
+  }
+  
+  canRedo() {
+    return this.#index < this.#history.length - 1;
+  }
+}
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Custom plugins" icon="wand-magic-sparkles" href="/concepts/plugins#creating-custom-plugins">
+    Build your own plugins
+  </Card>
+  <Card title="Modifiers" icon="sliders" href="/concepts/modifiers">
+    Transform coordinates
+  </Card>
+  <Card title="Plugins API" icon="puzzle-piece" href="/api/abstract/plugins">
+    Plugin API reference
+  </Card>
+  <Card title="DOM plugins" icon="code" href="/api/dom/plugins">
+    Built-in DOM plugins
+  </Card>
+</CardGroup>

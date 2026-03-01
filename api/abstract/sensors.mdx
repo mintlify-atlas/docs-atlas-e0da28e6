@@ -1,0 +1,530 @@
+---
+title: 'Sensors'
+description: 'Input handlers for detecting and initiating drag operations'
+---
+
+`Sensor` is the abstract base class for all sensor implementations in dnd-kit. Sensors are responsible for detecting and initiating drag operations by handling user interactions such as mouse, touch, keyboard, or custom input methods.
+
+## Sensor Class
+
+### Constructor
+
+Creates a new sensor instance.
+
+```typescript
+class MySensor extends Sensor<T, U> {
+  constructor(manager: T, options?: U) {
+    super(manager, options);
+  }
+}
+```
+
+<ParamField path="manager" type="T extends DragDropManager" required>
+  The drag and drop manager instance.
+</ParamField>
+
+<ParamField path="options" type="U extends SensorOptions" optional>
+  Optional sensor configuration.
+</ParamField>
+
+<ParamField path="T" type="extends DragDropManager<any, any>" default="DragDropManager<Draggable, Droppable>">
+  Type parameter for the drag drop manager.
+</ParamField>
+
+<ParamField path="U" type="extends SensorOptions" default="SensorOptions">
+  Type parameter for sensor options.
+</ParamField>
+
+## Properties
+
+### manager
+
+<ParamField path="manager" type="T" readonly>
+  The drag drop manager instance that this sensor is bound to.
+
+  ```typescript
+  const manager = sensor.manager;
+  ```
+</ParamField>
+
+### options
+
+<ParamField path="options" type="U | undefined" readonly>
+  The configuration options for this sensor instance.
+
+  ```typescript
+  const options = sensor.options;
+  ```
+</ParamField>
+
+### disabled
+
+<ParamField path="disabled" type="boolean" reactive>
+  Whether the sensor instance is disabled.
+
+  ```typescript
+  sensor.disabled = true;
+  ```
+
+  Inherited from `Plugin`.
+</ParamField>
+
+## Methods
+
+### bind() (abstract)
+
+Binds the sensor to a draggable source. Must be implemented by subclasses.
+
+```typescript
+public abstract bind(source: Draggable, options?: U): CleanupFunction;
+```
+
+<ParamField path="source" type="Draggable" required>
+  The draggable element to bind to.
+</ParamField>
+
+<ParamField path="options" type="U" optional>
+  Optional sensor options specific to this draggable.
+</ParamField>
+
+<ResponseField name="return" type="CleanupFunction">
+  A cleanup function that unbinds the sensor when called.
+
+  ```typescript
+  type CleanupFunction = () => void;
+  ```
+</ResponseField>
+
+### Inherited from Plugin
+
+### enable()
+
+Enables a disabled sensor instance.
+
+```typescript
+sensor.enable();
+```
+
+### disable()
+
+Disables an enabled sensor instance.
+
+```typescript
+sensor.disable();
+```
+
+### isDisabled()
+
+Checks if the sensor instance is disabled.
+
+```typescript
+const disabled = sensor.isDisabled();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if the sensor is disabled.
+</ResponseField>
+
+### configure()
+
+Configures a sensor instance with new options.
+
+```typescript
+sensor.configure({option: 'value'});
+```
+
+<ParamField path="options" type="U" optional>
+  The new options to apply.
+</ParamField>
+
+### destroy()
+
+Destroys a sensor instance and cleans up its resources.
+
+```typescript
+sensor.destroy();
+```
+
+## Static Methods
+
+### configure()
+
+Configures a sensor constructor with default options.
+
+```typescript
+const ConfiguredSensor = MySensor.configure({
+  activationDistance: 10,
+  activationDelay: 200
+});
+```
+
+<ParamField path="options" type="PluginOptions" required>
+  The options to configure the constructor with.
+</ParamField>
+
+<ResponseField name="return" type="SensorDescriptor">
+  A configured sensor descriptor that can be passed to the manager.
+</ResponseField>
+
+## Types
+
+### SensorOptions
+
+Base type for sensor options.
+
+```typescript
+type SensorOptions = PluginOptions;
+type PluginOptions = Record<string, any>;
+```
+
+### SensorConstructor
+
+Constructor type for creating sensor instances.
+
+```typescript
+type SensorConstructor<T extends DragDropManager<any, any>> = 
+  PluginConstructor<T, Sensor<T>>;
+
+interface PluginConstructor<T, U> {
+  new (manager: T, options?: PluginOptions): U;
+}
+```
+
+### SensorDescriptor
+
+Descriptor type for configuring sensors.
+
+```typescript
+type SensorDescriptor<T extends DragDropManager<any, any>> = 
+  PluginDescriptor<T, Sensor<T>, SensorConstructor<T>>;
+
+type PluginDescriptor<T, U, V> = {
+  plugin: V;
+  options?: PluginOptions;
+};
+```
+
+### Sensors
+
+Array type for multiple sensor configurations.
+
+```typescript
+type Sensors<T extends DragDropManager<any, any>> = 
+  (SensorConstructor<T> | SensorDescriptor<T>)[];
+```
+
+## Activation Constraints
+
+### ActivationConstraint
+
+Abstract base class for activation constraints.
+
+```typescript
+abstract class ActivationConstraint<E extends Event, O extends ActivationConstraintOptions> {
+  constructor(protected options: O);
+  
+  abstract onEvent(event: E): void;
+  abstract abort(event?: E): void;
+  
+  protected activate(event: E): void;
+}
+```
+
+Activation constraints allow you to control when a drag operation should start based on specific conditions.
+
+### ActivationController
+
+Controller for managing activation constraints.
+
+```typescript
+class ActivationController<E extends Event> extends AbortController {
+  public activated: boolean;
+  
+  constructor(
+    constraints: ActivationConstraints<E> | undefined,
+    onActivate: (event: E) => void
+  );
+  
+  onEvent(event: E): void;
+  activate(event: E): void;
+  abort(event?: E): void;
+}
+```
+
+### ActivationConstraints
+
+Array type for activation constraints.
+
+```typescript
+type ActivationConstraints<E extends Event> = ActivationConstraint<E>[];
+```
+
+## Implementing a Custom Sensor
+
+### Basic Implementation
+
+```typescript
+import {Sensor, type SensorOptions} from '@dnd-kit/abstract';
+import type {Draggable} from '@dnd-kit/abstract';
+
+interface MySensorOptions extends SensorOptions {
+  threshold?: number;
+}
+
+class MySensor extends Sensor<DragDropManager, MySensorOptions> {
+  constructor(manager: DragDropManager, options?: MySensorOptions) {
+    super(manager, options);
+  }
+
+  public bind(source: Draggable, options?: MySensorOptions): CleanupFunction {
+    const threshold = options?.threshold ?? this.options?.threshold ?? 5;
+    
+    const handleStart = (event: PointerEvent) => {
+      if (this.isDisabled()) return;
+      
+      const controller = this.manager.actions.start({
+        source,
+        event,
+        coordinates: {x: event.clientX, y: event.clientY}
+      });
+      
+      // Handle move, end events...
+    };
+    
+    // Attach event listeners
+    source.element?.addEventListener('pointerdown', handleStart);
+    
+    // Return cleanup function
+    return () => {
+      source.element?.removeEventListener('pointerdown', handleStart);
+    };
+  }
+}
+```
+
+### With Activation Constraints
+
+```typescript
+import {
+  Sensor,
+  ActivationController,
+  ActivationConstraint,
+  type ActivationConstraints
+} from '@dnd-kit/abstract';
+
+class DelayConstraint extends ActivationConstraint<PointerEvent> {
+  private timeout?: number;
+  
+  onEvent(event: PointerEvent): void {
+    this.timeout = window.setTimeout(() => {
+      this.activate(event);
+    }, this.options.delay);
+  }
+  
+  abort(): void {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+    }
+  }
+}
+
+class MySensor extends Sensor {
+  public bind(source: Draggable): CleanupFunction {
+    const handlePointerDown = (event: PointerEvent) => {
+      const constraints: ActivationConstraints<PointerEvent> = [
+        new DelayConstraint({delay: 200})
+      ];
+      
+      const controller = new ActivationController(
+        constraints,
+        (event) => {
+          // Activation confirmed
+          this.manager.actions.start({
+            source,
+            event,
+            coordinates: {x: event.clientX, y: event.clientY}
+          });
+        }
+      );
+      
+      const handleMove = (event: PointerEvent) => {
+        controller.onEvent(event);
+      };
+      
+      const handleUp = () => {
+        controller.abort();
+        cleanup();
+      };
+      
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
+      
+      const cleanup = () => {
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
+      };
+    };
+    
+    source.element?.addEventListener('pointerdown', handlePointerDown);
+    
+    return () => {
+      source.element?.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }
+}
+```
+
+## Usage Examples
+
+### Using Sensors with Manager
+
+```typescript
+import {DragDropManager} from '@dnd-kit/abstract';
+import {PointerSensor, KeyboardSensor} from '@dnd-kit/dom/sensors';
+
+const manager = new DragDropManager({
+  sensors: [PointerSensor, KeyboardSensor]
+});
+```
+
+### Configuring Sensors
+
+```typescript
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraint: {
+        distance: 10 // Require 10px movement
+      }
+    }),
+    KeyboardSensor
+  ]
+});
+```
+
+### Per-Draggable Sensors
+
+```typescript
+import {Draggable} from '@dnd-kit/abstract';
+import {PointerSensor} from '@dnd-kit/dom/sensors';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    sensors: [PointerSensor] // Override manager's sensors
+  },
+  manager
+);
+```
+
+### Dynamic Sensor Management
+
+```typescript
+const manager = new DragDropManager();
+
+// Add sensors later
+manager.sensors = [PointerSensor, KeyboardSensor];
+
+// Disable a sensor temporarily
+const pointerSensor = manager.sensors.find(s => s instanceof PointerSensor);
+pointerSensor?.disable();
+
+// Re-enable
+pointerSensor?.enable();
+```
+
+### Extending Defaults
+
+```typescript
+const manager = new DragDropManager({
+  sensors: (defaults) => [
+    ...defaults,
+    CustomSensor
+  ]
+});
+```
+
+## Common Sensor Patterns
+
+### Pointer Sensor Pattern
+
+```typescript
+class PointerSensor extends Sensor {
+  public bind(source: Draggable): CleanupFunction {
+    const handlePointerDown = (event: PointerEvent) => {
+      event.preventDefault();
+      
+      const controller = this.manager.actions.start({
+        source,
+        event,
+        coordinates: {x: event.clientX, y: event.clientY}
+      });
+      
+      const handlePointerMove = (event: PointerEvent) => {
+        this.manager.actions.move({
+          to: {x: event.clientX, y: event.clientY},
+          event
+        });
+      };
+      
+      const handlePointerUp = (event: PointerEvent) => {
+        this.manager.actions.stop({event});
+        cleanup();
+      };
+      
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+      
+      controller.signal.addEventListener('abort', cleanup);
+      
+      const cleanup = () => {
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+      };
+    };
+    
+    source.element?.addEventListener('pointerdown', handlePointerDown);
+    
+    return () => {
+      source.element?.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }
+}
+```
+
+### Keyboard Sensor Pattern
+
+```typescript
+class KeyboardSensor extends Sensor {
+  public bind(source: Draggable): CleanupFunction {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        // Start drag
+        this.manager.actions.start({
+          source,
+          event,
+          coordinates: {x: 0, y: 0}
+        });
+      }
+      
+      if (event.key === 'ArrowUp') {
+        this.manager.actions.move({by: {x: 0, y: -10}, event});
+      }
+      // Handle other arrow keys...
+    };
+    
+    source.element?.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      source.element?.removeEventListener('keydown', handleKeyDown);
+    };
+  }
+}
+```
+
+## See Also
+
+- [DragDropManager](/api/abstract/drag-drop-manager) - Using sensors with the manager
+- [Draggable](/api/abstract/draggable) - Attaching sensors to draggables
+- [Plugins](/api/abstract/plugins) - Base plugin architecture
+- [Modifiers](/api/abstract/modifiers) - Transforming drag behavior

@@ -1,0 +1,579 @@
+---
+title: Draggables and Droppables
+description: Understand the entity system that represents draggable and droppable elements
+---
+
+Draggables and droppables are the fundamental entities in dnd-kit. They represent elements that can be dragged and elements that can receive dragged items.
+
+## Entity base class
+
+Both `Draggable` and `Droppable` extend a common `Entity` base class:
+
+```typescript
+class Entity<T extends Data = Data> {
+  id: UniqueIdentifier;
+  data: T;
+  disabled: boolean;
+  manager?: DragDropManager;
+  
+  register(): CleanupFunction | void;
+  unregister(): void;
+  destroy(): void;
+}
+```
+
+### Unique identifier
+
+Every entity has a unique identifier that can be a string or number:
+
+```typescript
+type UniqueIdentifier = string | number;
+```
+
+The `id` is used to:
+
+- Register/unregister entities in the manager's registry
+- Identify entities during drag operations
+- Look up entities by ID
+- Track entity relationships
+
+<Warning>
+Identifiers must be unique within their entity type. Having two draggables with the same ID will cause unexpected behavior.
+</Warning>
+
+### Data property
+
+The `data` property stores custom data associated with the entity:
+
+```typescript
+type Data = Record<string, any>;
+
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  data: {
+    title: 'My Item',
+    category: 'featured',
+    metadata: { /* ... */ },
+  },
+});
+```
+
+You can access this data during drag operations:
+
+```typescript
+manager.monitor.addEventListener('dragend', (event) => {
+  const {source, target} = event.operation;
+  
+  console.log('Dragged:', source?.data);
+  console.log('Dropped on:', target?.data);
+});
+```
+
+### Disabled state
+
+You can disable entities to prevent interaction:
+
+```typescript
+draggable.disabled = true;  // Can't be dragged
+droppable.disabled = true;  // Can't receive drops
+```
+
+Disabled entities:
+
+- Won't respond to sensor input (draggables)
+- Won't participate in collision detection (droppables)
+- Remain in the registry but are skipped during operations
+
+## Draggable
+
+A `Draggable` represents an element that can be dragged.
+
+### Creating a draggable
+
+```typescript
+import {Draggable} from '@dnd-kit/dom';
+
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    element: document.getElementById('item-1'),
+  },
+  manager
+);
+```
+
+### Type signature
+
+```typescript
+interface DraggableInput<T extends Data = Data> {
+  id: UniqueIdentifier;
+  element?: Element;
+  handle?: Element;
+  data?: T;
+  disabled?: boolean;
+  type?: Type;
+  sensors?: Sensors;
+  modifiers?: Modifiers;
+  plugins?: Plugins;
+  alignment?: Alignment;
+  register?: boolean;  // Default: true
+}
+
+class Draggable<T extends Data = Data> extends Entity<T> {
+  element?: Element;           // The draggable element
+  handle?: Element;            // Optional drag handle
+  type?: Type;                 // Category/type identifier
+  sensors?: Sensors;           // Per-entity sensors
+  modifiers?: Modifiers;       // Per-entity modifiers
+  plugins?: Plugins;           // Per-entity plugins
+  alignment?: Alignment;       // Positioning alignment
+  
+  status: DraggableStatus;     // Current status
+  isDragging: boolean;         // Currently being dragged
+  isDropping: boolean;         // Currently being dropped
+  isDragSource: boolean;       // Is the drag source
+}
+```
+
+### Element and handle
+
+The `element` is the DOM element that represents the draggable:
+
+```typescript
+const draggable = new Draggable({
+  id: 'item-1',
+  element: document.getElementById('item-1'),
+});
+```
+
+Optionally specify a `handle` to restrict where dragging can start:
+
+```typescript
+const draggable = new Draggable({
+  id: 'item-1',
+  element: document.getElementById('item-1'),
+  handle: document.querySelector('#item-1 .drag-handle'),
+});
+```
+
+When a handle is specified:
+
+- Dragging only starts when interacting with the handle
+- The rest of the element remains interactive
+- Useful for complex UI elements with buttons, links, etc.
+
+### Status tracking
+
+Draggables track their current status:
+
+```typescript
+type DraggableStatus = 'idle' | 'dragging' | 'dropping';
+
+// Check status
+if (draggable.status === 'dragging') {
+  // Currently being dragged
+}
+
+// Convenience getters
+if (draggable.isDragging) {
+  // Same as status === 'dragging' && isDragSource
+}
+
+if (draggable.isDragSource) {
+  // This draggable is the source of the current drag
+}
+```
+
+Status transitions:
+
+```
+idle → dragging → dropping → idle
+       ↓
+       idle (if canceled)
+```
+
+### Type categorization
+
+The `type` property categorizes draggables:
+
+```typescript
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  type: 'card',
+});
+```
+
+Droppables can accept only specific types:
+
+```typescript
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  accept: 'card',  // Only accepts 'card' type draggables
+});
+```
+
+### Per-entity configuration
+
+You can override manager settings for individual draggables:
+
+```typescript
+import {PointerSensor} from '@dnd-kit/dom';
+import {RestrictToVerticalAxis} from '@dnd-kit/abstract';
+
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  
+  // Use specific sensors for this draggable
+  sensors: [PointerSensor],
+  
+  // Apply modifiers only to this draggable
+  modifiers: [RestrictToVerticalAxis],
+  
+  // Configure plugins for this draggable
+  plugins: [
+    MyPlugin.configure({ /* options */ }),
+  ],
+});
+```
+
+## Droppable
+
+A `Droppable` represents an element that can receive dragged items.
+
+### Creating a droppable
+
+```typescript
+import {Droppable} from '@dnd-kit/dom';
+import {pointerIntersection} from '@dnd-kit/dom';
+
+const droppable = new Droppable(
+  {
+    id: 'container-1',
+    element: document.getElementById('container-1'),
+    collisionDetector: pointerIntersection,
+  },
+  manager
+);
+```
+
+### Type signature
+
+```typescript
+interface DroppableInput<T extends Data = Data> {
+  id: UniqueIdentifier;
+  element?: Element;
+  data?: T;
+  disabled?: boolean;
+  type?: Type;
+  accept?: Type | Type[] | ((source: Draggable) => boolean);
+  collisionDetector: CollisionDetector;
+  collisionPriority?: CollisionPriority | number;
+  register?: boolean;  // Default: true
+}
+
+class Droppable<T extends Data = Data> extends Entity<T> {
+  element?: Element;                  // The droppable element
+  type?: Type;                        // Category/type identifier
+  accept?: Type | Type[] | Function;  // Acceptance rules
+  collisionDetector: CollisionDetector;
+  collisionPriority?: CollisionPriority | number;
+  shape?: Shape;                      // Current bounding rectangle
+  
+  isDropTarget: boolean;              // Is the current drop target
+  accepts(draggable: Draggable): boolean;
+}
+```
+
+### Collision detection
+
+Every droppable requires a collision detector:
+
+```typescript
+import {
+  pointerIntersection,
+  shapeIntersection,
+  centerOfMass,
+  closestCorners,
+} from '@dnd-kit/dom';
+
+const droppable = new Droppable({
+  id: 'container-1',
+  element: containerElement,
+  collisionDetector: pointerIntersection,  // Required
+});
+```
+
+See [Collision detection](/concepts/collision-detection) for available detectors.
+
+### Acceptance rules
+
+Control which draggables can be dropped:
+
+**Accept a specific type:**
+
+```typescript
+const droppable = new Droppable({
+  id: 'cards-container',
+  element: containerElement,
+  accept: 'card',
+  collisionDetector: pointerIntersection,
+});
+```
+
+**Accept multiple types:**
+
+```typescript
+const droppable = new Droppable({
+  id: 'mixed-container',
+  element: containerElement,
+  accept: ['card', 'token', 'piece'],
+  collisionDetector: pointerIntersection,
+});
+```
+
+**Custom acceptance function:**
+
+```typescript
+const droppable = new Droppable({
+  id: 'special-container',
+  element: containerElement,
+  accept: (draggable) => {
+    // Custom logic
+    return draggable.data?.category === 'premium';
+  },
+  collisionDetector: pointerIntersection,
+});
+```
+
+**Accept all (default):**
+
+```typescript
+const droppable = new Droppable({
+  id: 'universal-container',
+  element: containerElement,
+  // accept: undefined (default - accepts all)
+  collisionDetector: pointerIntersection,
+});
+```
+
+### Collision priority
+
+When multiple droppables collide, priority determines the winner:
+
+```typescript
+enum CollisionPriority {
+  Lowest,   // 0
+  Low,      // 1
+  Normal,   // 2 (default)
+  High,     // 3
+  Highest,  // 4
+}
+
+const droppable = new Droppable({
+  id: 'priority-container',
+  element: containerElement,
+  collisionDetector: pointerIntersection,
+  collisionPriority: CollisionPriority.High,
+});
+```
+
+You can also use custom numeric priorities:
+
+```typescript
+const droppable = new Droppable({
+  id: 'custom-priority',
+  element: containerElement,
+  collisionDetector: pointerIntersection,
+  collisionPriority: 100,  // Custom priority
+});
+```
+
+### Shape tracking
+
+Droppables track their bounding rectangle:
+
+```typescript
+const {shape} = droppable;
+
+if (shape) {
+  console.log('Position:', shape.x, shape.y);
+  console.log('Size:', shape.width, shape.height);
+}
+```
+
+The shape is automatically updated during drag operations.
+
+### Drop target status
+
+Check if a droppable is the current drop target:
+
+```typescript
+if (droppable.isDropTarget) {
+  // This droppable is the target of the current drag
+}
+```
+
+## Registration
+
+Entities automatically register with the manager when created:
+
+```typescript
+const draggable = new Draggable(
+  {id: 'item-1', element: myElement},
+  manager  // Automatically registers
+);
+```
+
+### Manual registration
+
+You can disable automatic registration:
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    element: myElement,
+    register: false,  // Don't auto-register
+  },
+  manager
+);
+
+// Register manually later
+const cleanup = draggable.register();
+
+// Unregister when done
+cleanup();
+// or
+draggable.unregister();
+```
+
+### Registration lifecycle
+
+Entities can register effects that run when registered:
+
+```typescript
+const draggable = new Draggable(
+  {
+    id: 'item-1',
+    element: myElement,
+    effects: () => [
+      // Effect runs when registered
+      () => {
+        console.log('Registered');
+        
+        // Cleanup runs when unregistered
+        return () => console.log('Unregistered');
+      },
+    ],
+  },
+  manager
+);
+```
+
+## Reactive properties
+
+Many entity properties are reactive:
+
+```typescript
+import {effect} from '@dnd-kit/state';
+
+// React to property changes
+effect(() => {
+  if (draggable.isDragging) {
+    console.log('Started dragging');
+  }
+});
+
+effect(() => {
+  if (droppable.isDropTarget) {
+    console.log('Is drop target');
+  }
+});
+```
+
+Reactive properties:
+
+- `disabled`
+- `data`
+- `type`
+- `status` (draggables)
+- `accept` (droppables)
+- `shape` (droppables)
+- `modifiers` (draggables)
+
+## Type safety
+
+You can type the data property:
+
+```typescript
+interface CardData {
+  title: string;
+  category: string;
+  priority: number;
+}
+
+const draggable = new Draggable<CardData>(
+  {
+    id: 'card-1',
+    element: myElement,
+    data: {
+      title: 'My Card',
+      category: 'tasks',
+      priority: 1,
+    },
+  },
+  manager
+);
+
+// Type-safe access
+const title: string = draggable.data.title;
+```
+
+## Framework integration
+
+Framework adapters provide idiomatic APIs:
+
+```tsx
+// React example
+import {useDraggable, useDroppable} from '@dnd-kit/react';
+
+function DraggableCard({id, data}) {
+  const {ref} = useDraggable({
+    id,
+    data,
+    type: 'card',
+  });
+  
+  return <div ref={ref}>Card</div>;
+}
+
+function DroppableContainer({id}) {
+  const {ref} = useDroppable({
+    id,
+    accept: 'card',
+  });
+  
+  return <div ref={ref}>Container</div>;
+}
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Draggable API" icon="hand" href="/api/abstract/draggable">
+    Draggable API reference
+  </Card>
+  <Card title="Droppable API" icon="folder-open" href="/api/abstract/droppable">
+    Droppable API reference
+  </Card>
+  <Card title="Collision detection" icon="compress" href="/concepts/collision-detection">
+    How collisions work
+  </Card>
+  <Card title="Data flow" icon="diagram-project" href="/concepts/draggables-droppables">
+    Working with entity data
+  </Card>
+</CardGroup>

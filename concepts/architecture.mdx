@@ -1,0 +1,240 @@
+---
+title: Architecture overview
+description: Understand the layered architecture of dnd-kit and how its components work together
+---
+
+The dnd-kit library uses a layered architecture that separates abstract core logic from concrete implementations, making it highly modular, framework-agnostic, and extensible.
+
+## Layered design
+
+The architecture consists of three main layers:
+
+```
+┌─────────────────────────────────────────────┐
+│  Framework Adapters (React, Vue, Svelte)   │
+│  @dnd-kit/react, @dnd-kit/vue, etc.        │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  DOM Implementation Layer                   │
+│  @dnd-kit/dom                               │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  Abstract Core                              │
+│  @dnd-kit/abstract                          │
+└─────────────────────────────────────────────┘
+```
+
+### Abstract core layer
+
+The `@dnd-kit/abstract` package provides the foundational abstractions and business logic:
+
+- **DragDropManager**: Central orchestrator for drag and drop operations
+- **Entity system**: Base classes for `Draggable` and `Droppable` entities
+- **Sensor architecture**: Abstract base class for input handling
+- **Collision detection**: Priority-based collision system
+- **Plugin system**: Extensibility through plugins
+- **Modifier system**: Coordinate transformation pipeline
+
+<Info>
+The abstract layer is framework-agnostic and has no DOM dependencies. You typically won't use this package directly unless you're building a custom implementation layer.
+</Info>
+
+### DOM implementation layer
+
+The `@dnd-kit/dom` package builds on the abstract core and adds DOM-specific functionality:
+
+- **Concrete implementations**: DOM-based `Draggable` and `Droppable` classes
+- **Input sensors**: `PointerSensor` (mouse/touch/pen) and `KeyboardSensor`
+- **DOM plugins**: Visual feedback, accessibility, auto-scrolling, cursor management
+- **Utilities**: DOM helpers for positioning, transforms, and scrolling
+- **Sortable primitives**: Higher-level sorting abstractions
+
+The DOM layer works directly with browser APIs and can be used in vanilla JavaScript projects.
+
+### Framework adapter layer
+
+Framework-specific packages (`@dnd-kit/react`, `@dnd-kit/vue`, etc.) provide idiomatic APIs:
+
+- **Framework integration**: Hooks, composables, or components
+- **Reactive bindings**: Integration with framework reactivity systems
+- **Lifecycle management**: Automatic setup and cleanup
+- **Type safety**: Framework-specific type definitions
+
+## Core concepts
+
+### Entities
+
+Entities represent the fundamental units in the drag and drop system:
+
+```typescript
+class Entity<T extends Data = Data> {
+  id: UniqueIdentifier;
+  data: T;
+  disabled: boolean;
+  manager?: DragDropManager;
+}
+```
+
+- **Draggable**: Entities that can be dragged
+- **Droppable**: Entities that can receive dragged items
+
+Each entity has a unique identifier, optional data, and can be enabled or disabled.
+
+### Manager
+
+The `DragDropManager` orchestrates all drag and drop operations:
+
+```typescript
+class DragDropManager<T extends Draggable, U extends Droppable> {
+  actions: DragActions;              // Start, move, stop operations
+  registry: DragDropRegistry;        // Manages entities
+  dragOperation: DragOperation;      // Current operation state
+  monitor: DragDropMonitor;          // Event monitoring
+  collisionObserver: CollisionObserver; // Collision detection
+  sensors: Sensor[];                 // Input handling
+  plugins: Plugin[];                 // Extensions
+  modifiers: Modifier[];             // Coordinate transforms
+}
+```
+
+### Reactive state
+
+The library uses the `@dnd-kit/state` package for fine-grained reactivity:
+
+- **Signals**: Primitive reactive values
+- **Derived values**: Computed from other reactive values
+- **Effects**: Side effects that run when dependencies change
+- **Batching**: Multiple updates in a single transaction
+
+This provides framework-agnostic reactivity that adapters can bridge to their framework's system.
+
+## Data flow
+
+Here's how data flows through the system during a drag operation:
+
+1. **User interaction**: Sensor detects pointer/keyboard input
+2. **Activation**: Sensor validates constraints and starts drag
+3. **Manager actions**: `actions.start()` initializes the operation
+4. **State updates**: `dragOperation` updates with source, position, shape
+5. **Collision detection**: `collisionObserver` computes intersections
+6. **Target updates**: `dragOperation.target` set to collision winner
+7. **Modifier pipeline**: Coordinates transformed by active modifiers
+8. **Plugin reactions**: Plugins respond to state changes (feedback, scrolling)
+9. **Movement**: `actions.move()` updates position as user drags
+10. **Completion**: `actions.stop()` ends operation, fires events
+
+## Extension points
+
+The architecture provides multiple extension points:
+
+### Sensors
+
+Create custom input methods by extending the `Sensor` base class:
+
+```typescript
+class CustomSensor extends Sensor {
+  bind(source: Draggable): CleanupFunction {
+    // Set up event listeners
+    // Call manager.actions.start/move/stop
+    // Return cleanup function
+  }
+}
+```
+
+### Plugins
+
+Add features by extending the `Plugin` base class:
+
+```typescript
+class CustomPlugin extends Plugin {
+  constructor(manager: DragDropManager, options?: PluginOptions) {
+    super(manager, options);
+    this.registerEffect(() => {
+      // React to drag operation changes
+    });
+  }
+}
+```
+
+### Modifiers
+
+Transform coordinates by extending the `Modifier` base class:
+
+```typescript
+class CustomModifier extends Modifier {
+  apply(operation: DragOperationSnapshot): Coordinates {
+    const {transform} = operation;
+    // Return modified coordinates
+    return {x: transform.x, y: transform.y};
+  }
+}
+```
+
+### Collision detectors
+
+Implement custom collision algorithms:
+
+```typescript
+const customDetector: CollisionDetector = ({droppable, dragOperation}) => {
+  // Return Collision object or null
+  return {
+    id: droppable.id,
+    priority: CollisionPriority.Normal,
+    type: CollisionType.Collision,
+    value: 1.0,
+  };
+};
+```
+
+## Package structure
+
+The monorepo is organized into focused packages:
+
+- **@dnd-kit/abstract**: Core abstractions
+- **@dnd-kit/dom**: DOM implementation
+- **@dnd-kit/react**: React adapter
+- **@dnd-kit/state**: Reactive state primitives
+- **@dnd-kit/geometry**: Spatial utilities (shapes, coordinates)
+- **@dnd-kit/helpers**: Shared utilities
+
+<Tip>
+This separation means you can use different parts of the library in different ways. For example, you could use `@dnd-kit/geometry` utilities in a project that doesn't even use drag and drop.
+</Tip>
+
+## Type safety
+
+The library is built with TypeScript and provides comprehensive type definitions:
+
+```typescript
+// Generic types flow through the entire system
+class DragDropManager<
+  T extends Draggable,  // Draggable type
+  U extends Droppable   // Droppable type
+> {
+  // Plugins, sensors, and modifiers are properly typed
+  plugins: Plugins<DragDropManager<T, U>>;
+  sensors: Sensors<DragDropManager<T, U>>;
+  modifiers: Modifiers<DragDropManager<T, U>>;
+}
+```
+
+Type inference ensures your plugins, sensors, and modifiers are compatible with your manager configuration.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="DragDropManager" icon="gears" href="/concepts/drag-drop-manager">
+    Learn about the central manager class
+  </Card>
+  <Card title="Draggables and Droppables" icon="hand" href="/concepts/draggables-droppables">
+    Understand the entity system
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Explore input handling
+  </Card>
+  <Card title="Plugins" icon="plug" href="/concepts/plugins">
+    Extend functionality with plugins
+  </Card>
+</CardGroup>

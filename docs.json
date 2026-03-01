@@ -1,122 +1,170 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "dnd kit",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#3b82f6",
+    "light": "#60a5fa",
+    "dark": "#2563eb"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/clauderic/dnd-kit"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/clauderic/dnd-kit"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/drag-drop-manager",
+              "concepts/draggables-droppables",
+              "concepts/sensors",
+              "concepts/collision-detection",
+              "concepts/modifiers",
+              "concepts/plugins"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Framework Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "frameworks/vanilla",
+              "frameworks/react",
+              "frameworks/vue",
+              "frameworks/svelte",
+              "frameworks/solid"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Guides",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/sortable",
+              "guides/accessibility",
+              "guides/custom-sensors",
+              "guides/animations",
+              "guides/performance"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core Packages",
             "pages": [
-              "api-reference/introduction"
+              "api/abstract/overview",
+              "api/abstract/drag-drop-manager",
+              "api/abstract/draggable",
+              "api/abstract/droppable",
+              "api/abstract/sensors",
+              "api/abstract/modifiers",
+              "api/abstract/plugins"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "DOM Implementation",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/dom/overview",
+              "api/dom/drag-drop-manager",
+              "api/dom/sensors",
+              "api/dom/plugins",
+              "api/dom/sortable"
+            ]
+          },
+          {
+            "group": "React",
+            "pages": [
+              "api/react/overview",
+              "api/react/drag-drop-provider",
+              "api/react/use-draggable",
+              "api/react/use-droppable",
+              "api/react/use-sortable",
+              "api/react/drag-overlay",
+              "api/react/hooks"
+            ]
+          },
+          {
+            "group": "Vue",
+            "pages": [
+              "api/vue/overview",
+              "api/vue/composables"
+            ]
+          },
+          {
+            "group": "Svelte",
+            "pages": [
+              "api/svelte/overview",
+              "api/svelte/primitives"
+            ]
+          },
+          {
+            "group": "Solid",
+            "pages": [
+              "api/solid/overview",
+              "api/solid/hooks"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/collision/algorithms",
+              "api/geometry/utilities",
+              "api/helpers/utilities",
+              "api/state/management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Examples",
+            "pages": [
+              "examples/simple-drag-drop",
+              "examples/multiple-containers",
+              "examples/nested-contexts"
+            ]
+          },
+          {
+            "group": "Sortable Lists",
+            "pages": [
+              "examples/sortable-list",
+              "examples/sortable-grid",
+              "examples/multiple-lists",
+              "examples/virtualized-lists"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "examples/custom-collision-detection",
+              "examples/custom-animations",
+              "examples/accessibility-features",
+              "examples/touch-keyboard-support"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

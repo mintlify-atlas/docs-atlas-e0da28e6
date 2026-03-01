@@ -1,0 +1,554 @@
+---
+title: Sensors
+description: Understand how sensors detect user input and translate interactions into drag operations
+---
+
+Sensors are responsible for detecting user input and initiating drag operations. They handle the actual interaction layer (mouse, touch, keyboard, etc.) and translate those interactions into drag operations that the manager can coordinate.
+
+## Overview
+
+Sensors:
+
+- Detect user input (pointer events, keyboard events, etc.)
+- Validate activation constraints
+- Initiate drag operations by calling manager actions
+- Handle movement and completion
+- Clean up event listeners when done
+
+## Built-in sensors
+
+dnd-kit provides two primary sensors in `@dnd-kit/dom`:
+
+### PointerSensor
+
+Handles mouse, touch, and pen input:
+
+```typescript
+import {PointerSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [PointerSensor],
+});
+```
+
+The `PointerSensor` uses the Pointer Events API, which unifies mouse, touch, and pen interactions.
+
+### KeyboardSensor
+
+Handles keyboard navigation:
+
+```typescript
+import {KeyboardSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [KeyboardSensor],
+});
+```
+
+The `KeyboardSensor` enables accessibility by allowing users to drag items using arrow keys.
+
+### Default configuration
+
+By default, both sensors are enabled:
+
+```typescript
+import {PointerSensor, KeyboardSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [PointerSensor, KeyboardSensor],
+});
+```
+
+## Sensor architecture
+
+### Base class
+
+All sensors extend the abstract `Sensor` base class:
+
+```typescript
+abstract class Sensor<
+  T extends DragDropManager<any, any>,
+  U extends SensorOptions = SensorOptions
+> extends Plugin<T, U> {
+  constructor(
+    public manager: T,
+    public options?: U
+  );
+  
+  abstract bind(source: Draggable, options?: U): CleanupFunction;
+}
+```
+
+### Lifecycle
+
+1. **Binding**: The sensor binds to each draggable element
+2. **Activation**: User interaction triggers activation constraints
+3. **Start**: Constraints are met, drag operation starts
+4. **Move**: Sensor tracks movement and updates position
+5. **End**: User completes or cancels the drag
+6. **Cleanup**: Event listeners are removed
+
+## PointerSensor
+
+The `PointerSensor` handles pointer-based input.
+
+### Activation constraints
+
+Activation constraints prevent accidental drags:
+
+```typescript
+import {PointerSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints: (event, source) => {
+        // Touch: delay before activation
+        if (event.pointerType === 'touch') {
+          return [
+            new PointerActivationConstraints.Delay({
+              value: 250,    // 250ms delay
+              tolerance: 5,  // Allow 5px movement
+            }),
+          ];
+        }
+        
+        // Mouse: immediate activation
+        return undefined;
+      },
+    }),
+  ],
+});
+```
+
+### Built-in constraints
+
+**Delay constraint:**
+
+```typescript
+import {PointerActivationConstraints} from '@dnd-kit/dom';
+
+new PointerActivationConstraints.Delay({
+  value: 200,      // Wait 200ms
+  tolerance: 5,    // Allow 5px movement during delay
+});
+```
+
+**Distance constraint:**
+
+```typescript
+new PointerActivationConstraints.Distance({
+  value: 10,  // Require 10px movement
+});
+```
+
+### Default behavior
+
+The `PointerSensor` has smart defaults:
+
+```typescript
+// From PointerSensor.ts
+const defaults = {
+  activationConstraints(event, source) {
+    const {pointerType, target} = event;
+
+    // Mouse on drag handle: immediate
+    if (
+      pointerType === 'mouse' &&
+      (source.handle === target || source.handle?.contains(target))
+    ) {
+      return undefined;
+    }
+
+    // Touch: delay to allow scrolling
+    if (pointerType === 'touch') {
+      return [
+        new PointerActivationConstraints.Delay({value: 250, tolerance: 5}),
+      ];
+    }
+
+    // Text input: delay to allow selection
+    if (isTextInput(target) && !event.defaultPrevented) {
+      return [
+        new PointerActivationConstraints.Delay({value: 200, tolerance: 0}),
+      ];
+    }
+
+    // Default: small delay and distance
+    return [
+      new PointerActivationConstraints.Delay({value: 200, tolerance: 10}),
+      new PointerActivationConstraints.Distance({value: 5}),
+    ];
+  },
+};
+```
+
+### Configuration options
+
+```typescript
+interface PointerSensorOptions {
+  activationConstraints?:
+    | ActivationConstraints<PointerEvent>
+    | ((event: PointerEvent, source: Draggable) => 
+        ActivationConstraints<PointerEvent> | undefined);
+  
+  activatorElements?:
+    | Element[]
+    | ((source: Draggable) => Element[]);
+  
+  preventActivation?: (event: PointerEvent, source: Draggable) => boolean;
+}
+```
+
+**Custom activator elements:**
+
+```typescript
+PointerSensor.configure({
+  activatorElements: (source) => [
+    source.handle,
+    source.element.querySelector('.alternate-handle'),
+  ],
+});
+```
+
+**Prevent activation:**
+
+```typescript
+PointerSensor.configure({
+  preventActivation: (event, source) => {
+    // Don't activate on buttons
+    return event.target.tagName === 'BUTTON';
+  },
+});
+```
+
+## KeyboardSensor
+
+The `KeyboardSensor` enables keyboard-based dragging.
+
+### Activation
+
+By default:
+
+- Press `Space` or `Enter` on a draggable to start dragging
+- Use arrow keys to move
+- Press `Space` or `Enter` again to drop
+- Press `Escape` to cancel
+
+### Configuration
+
+```typescript
+import {KeyboardSensor} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    KeyboardSensor.configure({
+      // Custom key bindings
+      keyBindings: {
+        start: ['Space', 'Enter'],
+        cancel: ['Escape'],
+        end: ['Space', 'Enter'],
+      },
+      
+      // Movement amount per keystroke
+      coordinateGetter: (event, {currentCoordinates}) => {
+        const delta = 10;
+        
+        switch (event.key) {
+          case 'ArrowRight':
+            return {x: currentCoordinates.x + delta, y: currentCoordinates.y};
+          case 'ArrowLeft':
+            return {x: currentCoordinates.x - delta, y: currentCoordinates.y};
+          case 'ArrowDown':
+            return {x: currentCoordinates.x, y: currentCoordinates.y + delta};
+          case 'ArrowUp':
+            return {x: currentCoordinates.x, y: currentCoordinates.y - delta};
+        }
+        
+        return currentCoordinates;
+      },
+    }),
+  ],
+});
+```
+
+## Custom sensors
+
+You can create custom sensors by extending the `Sensor` base class.
+
+### Basic example
+
+```typescript
+import {Sensor} from '@dnd-kit/abstract';
+import type {Draggable, DragDropManager} from '@dnd-kit/abstract';
+import type {CleanupFunction} from '@dnd-kit/state';
+
+class CustomSensor extends Sensor<DragDropManager> {
+  bind(source: Draggable): CleanupFunction {
+    const handleStart = (event: CustomEvent) => {
+      if (this.disabled || source.disabled) return;
+      
+      // Start the drag operation
+      const controller = this.manager.actions.start({
+        source,
+        coordinates: {x: 0, y: 0},
+        event,
+      });
+      
+      if (controller.signal.aborted) return;
+      
+      // Set up movement tracking
+      // ...
+    };
+    
+    const element = source.element;
+    element?.addEventListener('customstart', handleStart);
+    
+    // Return cleanup function
+    return () => {
+      element?.removeEventListener('customstart', handleStart);
+    };
+  }
+}
+```
+
+### Using manager actions
+
+Sensors interact with the manager through actions:
+
+```typescript
+class MySensor extends Sensor {
+  bind(source: Draggable): CleanupFunction {
+    const handleStart = () => {
+      // Start drag operation
+      const controller = this.manager.actions.start({
+        source,
+        coordinates: {x: 0, y: 0},
+        event,
+      });
+      
+      if (controller.signal.aborted) {
+        // Activation was prevented
+        return;
+      }
+      
+      // Set up move handler
+      const handleMove = (newCoordinates) => {
+        this.manager.actions.move({
+          to: newCoordinates,
+          event,
+        });
+      };
+      
+      // Set up end handler
+      const handleEnd = () => {
+        this.manager.actions.stop({
+          event,
+          canceled: false,
+        });
+      };
+    };
+    
+    // Bind events...
+  }
+}
+```
+
+## Activation constraints
+
+Activation constraints determine when a drag should start:
+
+```typescript
+interface ActivationConstraint<T = Event> {
+  // Called when the constraint is met
+  onActivate?: (event: T) => void;
+  
+  // Called on each event
+  onEvent(event: T): void;
+  
+  // Signal that can abort the constraint
+  signal: AbortSignal;
+}
+
+type ActivationConstraints<T = Event> = ActivationConstraint<T>[];
+```
+
+### ActivationController
+
+The `ActivationController` manages constraints:
+
+```typescript
+import {ActivationController} from '@dnd-kit/abstract';
+
+const controller = new ActivationController(
+  constraints,  // Array of constraints
+  (event) => {  // Called when all constraints are met
+    // Start drag operation
+  }
+);
+
+// Feed events to the controller
+controller.onEvent(event);
+
+// Abort if needed
+controller.abort();
+```
+
+## Per-draggable sensors
+
+You can configure sensors per draggable:
+
+```typescript
+import {PointerSensor} from '@dnd-kit/dom';
+
+const draggable = new Draggable({
+  id: 'item-1',
+  element: myElement,
+  
+  // Only use PointerSensor for this draggable
+  sensors: [PointerSensor],
+});
+```
+
+This overrides the manager's default sensors for this specific draggable.
+
+## Configuration pattern
+
+Sensors use the configurator pattern for options:
+
+```typescript
+// Configure with options
+const ConfiguredSensor = PointerSensor.configure({
+  activationConstraints: /* ... */,
+});
+
+// Use in manager
+const manager = new DragDropManager({
+  sensors: [ConfiguredSensor],
+});
+
+// Or configure inline
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({ /* ... */ }),
+  ],
+});
+```
+
+### How it works
+
+The `configure` static method returns a descriptor:
+
+```typescript
+// From plugin.ts
+static configure(options: PluginOptions) {
+  return configure(this as any, options);
+}
+
+// Creates a descriptor
+type SensorDescriptor = {
+  plugin: SensorConstructor;
+  options: SensorOptions;
+};
+```
+
+The manager resolves descriptors when creating sensor instances:
+
+```typescript
+// Sensor constructor
+new PointerSensor(manager, options);
+
+// Or from descriptor
+const {plugin, options} = descriptor;
+new plugin(manager, options);
+```
+
+## Sensor implementation details
+
+### Binding to draggables
+
+When a draggable is registered, sensors bind to it:
+
+```typescript
+// From PointerSensor.ts
+bind(source: Draggable, options = this.options): CleanupFunction {
+  const controller = new AbortController();
+  const {signal} = controller;
+  
+  const listener = (event: Event) => {
+    if (isPointerEvent(event)) {
+      this.handlePointerDown(event, source, options);
+    }
+  };
+  
+  const targets = [source.handle ?? source.element];
+  
+  for (const target of targets) {
+    if (!target) continue;
+    target.addEventListener('pointerdown', listener, {signal});
+  }
+  
+  return () => controller.abort();
+}
+```
+
+### Movement tracking
+
+Sensors track movement and update the manager:
+
+```typescript
+// From PointerSensor.ts
+handlePointerMove(event: PointerEvent, source: Draggable) {
+  if (this.manager.dragOperation.status.dragging) {
+    const coordinates = getEventCoordinates(event);
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    this.manager.actions.move({event, to: coordinates});
+  }
+}
+```
+
+### Cleanup
+
+Sensors clean up when destroyed:
+
+```typescript
+// From PointerSensor.ts
+destroy() {
+  this.cleanup();
+  this.listeners.clear();
+}
+```
+
+## Best practices
+
+<Tip>
+**Use both sensors by default**: The `PointerSensor` and `KeyboardSensor` work well together and provide the best experience for all users.
+</Tip>
+
+<Warning>
+**Don't forget activation constraints**: Always configure appropriate activation constraints to prevent accidental drags, especially on touch devices.
+</Warning>
+
+<Info>
+**Test on multiple input types**: Make sure to test your drag and drop implementation with mouse, touch, and keyboard to ensure all sensors work correctly.
+</Info>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Sensors API" icon="hand-pointer" href="/api/abstract/sensors">
+    Sensors API reference
+  </Card>
+  <Card title="Custom sensors" icon="wand-magic-sparkles" href="/guides/custom-sensors">
+    Build your own sensors
+  </Card>
+  <Card title="Accessibility" icon="universal-access" href="/guides/accessibility">
+    Keyboard navigation
+  </Card>
+  <Card title="Touch devices" icon="mobile" href="/examples/touch-keyboard-support">
+    Touch-specific configuration
+  </Card>
+</CardGroup>

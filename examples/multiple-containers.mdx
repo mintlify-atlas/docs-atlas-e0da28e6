@@ -1,0 +1,372 @@
+---
+title: Multiple Drop Containers
+description: Build complex drag and drop interfaces with multiple containers and cross-container dragging
+---
+
+## Overview
+
+Once you've mastered the basics, you'll often need to handle multiple drop containers. This guide shows you how to create a drag and drop interface where items can be moved between multiple containers, like a kanban board or card organizer.
+
+## What You'll Build
+
+A multi-container drag and drop interface featuring:
+- Multiple drop zones with unique identities
+- Ability to drag items between any container
+- Visual feedback showing which container will receive the item
+- State management for tracking items across containers
+
+## Prerequisites
+
+This guide assumes you understand the basics from the [Simple Drag and Drop](/examples/simple-drag-drop) guide.
+
+## Implementation
+
+<Steps>
+
+### Define Your Container Structure
+
+Start by defining your containers and their initial state. Use an object where keys are container IDs and values are arrays of item IDs.
+
+```tsx
+import { useState } from 'react';
+
+function App() {
+  const [items, setItems] = useState({
+    A: ['A1', 'A2', 'A3'],
+    B: ['B1', 'B2', 'B3'],
+    C: ['C1', 'C2', 'C3'],
+    D: []
+  });
+
+  // Containers can be derived from the items object
+  const containers = Object.keys(items); // ['A', 'B', 'C', 'D']
+}
+```
+
+**Key concepts:**
+- Each container has a unique ID (A, B, C, D)
+- Items are stored as arrays within each container
+- Empty arrays represent empty containers
+- This structure makes it easy to move items between containers
+
+### Create Reusable Draggable Items
+
+Create draggable items that know which container they belong to. This is important for proper state management.
+
+```tsx
+import { useDraggable } from '@dnd-kit/react';
+
+function DraggableItem({ id, container }: { id: string; container: string }) {
+  const { ref, isDragging } = useDraggable({ 
+    id,
+    data: { container } // Store container info for later use
+  });
+
+  return (
+    <div 
+      ref={ref} 
+      className="item"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- Store the container ID in the `data` object
+- Use `isDragging` to provide visual feedback
+- The item ID should be unique across all containers
+
+### Create Container Components
+
+Each container acts as both a drop zone and a list of items.
+
+```tsx
+import { useDroppable } from '@dnd-kit/react';
+
+function Container({ 
+  id, 
+  items 
+}: { 
+  id: string; 
+  items: string[];
+}) {
+  const { ref, isDropTarget } = useDroppable({ id });
+
+  return (
+    <div 
+      ref={ref} 
+      className={`container ${isDropTarget ? 'active' : ''}`}
+    >
+      <h3>Container {id}</h3>
+      <div className="items">
+        {items.map((itemId) => (
+          <DraggableItem 
+            key={itemId} 
+            id={itemId} 
+            container={id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- Each container is a droppable zone
+- Items are rendered from the container's item array
+- Visual feedback shows when a container is a valid drop target
+
+### Handle Cross-Container Moves
+
+Update your state when items are dropped into different containers.
+
+```tsx
+import { DragDropProvider } from '@dnd-kit/react';
+
+function App() {
+  const [items, setItems] = useState({
+    A: ['A1', 'A2', 'A3'],
+    B: ['B1', 'B2', 'B3'],
+    C: ['C1', 'C2', 'C3'],
+    D: []
+  });
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        if (event.canceled) return;
+
+        const { source, target } = event.operation;
+        if (!source || !target) return;
+
+        const sourceContainer = source.data?.container as string;
+        const targetContainer = target.id as string;
+
+        setItems((prev) => {
+          const newItems = { ...prev };
+          
+          // Remove from source container
+          newItems[sourceContainer] = newItems[sourceContainer].filter(
+            (id) => id !== source.id
+          );
+          
+          // Add to target container
+          newItems[targetContainer] = [
+            ...newItems[targetContainer],
+            source.id as string
+          ];
+          
+          return newItems;
+        });
+      }}
+    >
+      <div className="grid">
+        {Object.entries(items).map(([containerId, containerItems]) => (
+          <Container 
+            key={containerId} 
+            id={containerId} 
+            items={containerItems}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+**Key concepts:**
+- Access source container from `source.data.container`
+- Target container is `target.id`
+- Remove item from source array
+- Add item to target array
+- Use functional state updates for reliability
+
+</Steps>
+
+## Complete Example
+
+Here's a full working implementation with multiple containers:
+
+```tsx
+import React, { useState } from 'react';
+import { DragDropProvider, useDraggable, useDroppable } from '@dnd-kit/react';
+
+function Draggable({ id }: { id: string }) {
+  const { ref } = useDraggable({ id });
+  return <button ref={ref} className="btn">draggable</button>;
+}
+
+function Droppable({ id, children }: { id: string; children?: React.ReactNode }) {
+  const { ref, isDropTarget } = useDroppable({ id });
+  
+  return (
+    <div ref={ref} className={isDropTarget ? "droppable active" : "droppable"}>
+      <h3>Container {id}</h3>
+      {children}
+    </div>
+  );
+}
+
+export default function App() {
+  const [parent, setParent] = useState<string | undefined>(undefined);
+  const draggable = <Draggable id="draggable" />;
+  const droppables = ['A', 'B', 'C'];
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        if (event.canceled) return;
+        setParent(event.operation.target?.id as string);
+      }}
+    >
+      <div className="grid">
+        <div className="start-zone">
+          {parent == null ? draggable : null}
+        </div>
+        {droppables.map((id) => (
+          <Droppable key={id} id={id}>
+            {parent === id ? draggable : null}
+          </Droppable>
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Styling
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.container {
+  min-height: 200px;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.2s;
+}
+
+.container.active {
+  border-color: #0070f3;
+  background: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(0, 112, 243, 0.1);
+}
+
+.container h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item {
+  padding: 12px;
+  background: #0070f3;
+  color: white;
+  border-radius: 6px;
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+
+.item:active {
+  cursor: grabbing;
+}
+
+.start-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 16px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background: #fafafa;
+}
+```
+
+## Advanced: Using the Move Helper
+
+For sortable lists within containers, dnd-kit provides a `move` helper from `@dnd-kit/helpers`:
+
+```tsx
+import { move } from '@dnd-kit/helpers';
+import { useSortable } from '@dnd-kit/react/sortable';
+
+// In your onDragEnd handler:
+onDragEnd={(event) => {
+  if (event.canceled) return;
+  
+  setItems((items) => move(items, event));
+}}
+```
+
+This automatically handles moving items between containers and reordering within containers.
+
+## Key Takeaways
+
+- Structure your state as an object mapping container IDs to item arrays
+- Store container information in the draggable's `data` property
+- Use `event.operation.source` and `event.operation.target` to identify containers
+- Remove items from the source container and add to the target container
+- The `move` helper from `@dnd-kit/helpers` can simplify state updates
+- Visual feedback helps users understand where items can be dropped
+
+## Common Patterns
+
+### Preventing Drops in Certain Containers
+
+```tsx
+onDragEnd={(event) => {
+  if (event.canceled) return;
+  
+  const targetContainer = event.operation.target?.id;
+  
+  // Don't allow drops in container D
+  if (targetContainer === 'D') return;
+  
+  // Continue with state update
+}}
+```
+
+### Limiting Items Per Container
+
+```tsx
+onDragEnd={(event) => {
+  const targetContainer = event.operation.target?.id as string;
+  const targetItems = items[targetContainer];
+  
+  // Max 5 items per container
+  if (targetItems.length >= 5) {
+    return; // Don't update state
+  }
+  
+  // Continue with state update
+}}
+```
+
+## Next Steps
+
+- Explore [Nested Contexts](/examples/nested-contexts) for hierarchical structures
+- Learn about sortable lists for ordering within containers
+- Add animations with drag overlays for smoother interactions

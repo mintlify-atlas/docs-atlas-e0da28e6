@@ -1,0 +1,464 @@
+---
+title: Animations and Transitions
+description: Create smooth, performant animations for drag operations and sortable list reordering
+---
+
+Dnd-kit provides built-in animation support for drag operations and automatic layout transitions. Learn how to customize animations for a polished user experience.
+
+## Sortable Transitions
+
+Sortable items automatically animate when their position changes:
+
+```tsx
+import {useSortable} from '@dnd-kit/react/sortable';
+
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    transition: {
+      duration: 250,                           // Animation duration in ms
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)', // CSS easing function
+      idle: false,                             // Animate when not dragging
+    },
+  });
+
+  return <div ref={setElement}>{id}</div>;
+}
+```
+
+### Transition Properties
+
+- **`duration`** - Animation length in milliseconds (default: `250`)
+- **`easing`** - CSS easing function (default: `'cubic-bezier(0.25, 1, 0.5, 1)'`)
+- **`idle`** - Whether to animate position changes when not dragging (default: `false`)
+
+## Default Transition Configuration
+
+The default sortable transition provides smooth, natural movement:
+
+```typescript
+const defaultSortableTransition = {
+  duration: 250,
+  easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+  idle: false,
+};
+```
+
+This configuration:
+- Uses a 250ms duration for quick but visible movement
+- Applies a custom cubic-bezier for natural acceleration
+- Only animates during active drag operations
+
+## Custom Easing Functions
+
+Use different easing functions to change animation feel:
+
+```tsx
+// Smooth ease-out
+const smoothTransition = {
+  duration: 300,
+  easing: 'ease-out',
+};
+
+// Bouncy animation
+const bouncyTransition = {
+  duration: 400,
+  easing: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+};
+
+// Linear movement
+const linearTransition = {
+  duration: 200,
+  easing: 'linear',
+};
+
+// Fast snap
+const snapTransition = {
+  duration: 150,
+  easing: 'cubic-bezier(0.4, 0, 1, 1)',
+};
+
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  transition: bouncyTransition,
+});
+```
+
+<Tip>
+Use [cubic-bezier.com](https://cubic-bezier.com) to visually design custom easing curves.
+</Tip>
+
+## Idle Transitions
+
+Enable `idle` to animate items even when not dragging:
+
+```tsx
+function App() {
+  const [items, setItems] = useState([1, 2, 3, 4, 5]);
+
+  return (
+    <>
+      <button onClick={() => setItems([...items].reverse())}>
+        Reverse Order
+      </button>
+      
+      <DragDropProvider onDragEnd={(e) => setItems(move(items, e))}>
+        {items.map((id, index) => (
+          <SortableItem
+            key={id}
+            id={id}
+            index={index}
+            transition={{
+              duration: 300,
+              easing: 'ease-out',
+              idle: true,  // Animates when button is clicked
+            }}
+          />
+        ))}
+      </DragDropProvider>
+    </>
+  );
+}
+```
+
+<Warning>
+Enabling `idle: true` can impact performance with large lists. Use sparingly for lists with fewer than 100 items.
+</Warning>
+
+## Disabling Transitions
+
+Disable transitions by setting `transition` to `null`:
+
+```tsx
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  transition: null,  // No animation
+});
+```
+
+## How Transitions Work
+
+Sortable transitions use the FLIP technique (First, Last, Invert, Play):
+
+1. **First** - Record the element's initial position
+2. **Last** - Update the DOM and record the final position
+3. **Invert** - Calculate the difference and apply a transform
+4. **Play** - Animate the transform back to 0
+
+From the source code:
+
+```typescript
+const delta = {
+  x: shape.boundingRectangle.left - updatedShape.boundingRectangle.left,
+  y: shape.boundingRectangle.top - updatedShape.boundingRectangle.top,
+};
+
+if (delta.x || delta.y) {
+  animateTransform({
+    element,
+    keyframes: {
+      translate: [
+        `${currentTranslate.x + delta.x}px ${currentTranslate.y + delta.y}px`,
+        `${finalTranslate.x}px ${finalTranslate.y}px`,
+      ],
+    },
+    options: transition,
+  });
+}
+```
+
+This technique ensures smooth transitions without layout thrashing.
+
+## Drag Overlay Animations
+
+Customize the drag overlay appearance during drag operations:
+
+```tsx
+import {DragOverlay} from '@dnd-kit/react';
+
+function App() {
+  const [activeId, setActiveId] = useState(null);
+
+  return (
+    <DragDropProvider
+      onDragStart={(event) => setActiveId(event.operation.source?.id)}
+      onDragEnd={() => setActiveId(null)}
+    >
+      {/* Your sortable items */}
+      
+      <DragOverlay>
+        {activeId ? (
+          <div
+            style={{
+              padding: 12,
+              background: '#4c9ffe',
+              borderRadius: 8,
+              opacity: 0.9,
+              transform: 'scale(1.05)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              cursor: 'grabbing',
+            }}
+          >
+            Dragging: {activeId}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DragDropProvider>
+  );
+}
+```
+
+## Styling During Drag States
+
+Apply different styles based on drag state:
+
+```tsx
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {
+    isDragging,    // This item is being dragged
+    isDragSource,  // This item is the source (stays true during drop animation)
+    isDropping,    // Drop animation is in progress
+    isDropTarget,  // Another item is being dragged over this item
+  } = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        transform: isDragging ? 'rotate(5deg)' : undefined,
+        background: isDropTarget ? '#e8f0fe' : 'white',
+        transition: 'opacity 200ms, background 200ms',
+        outline: isDropping ? '2px solid #4c9ffe' : 'none',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+## CSS-Based Animations
+
+Combine with CSS for additional effects:
+
+```css
+.sortable-item {
+  transition: opacity 200ms, transform 200ms;
+}
+
+.sortable-item[data-dragging="true"] {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.sortable-item[data-drop-target="true"] {
+  background: #e8f0fe;
+  border-color: #4c9ffe;
+}
+
+.sortable-item:not([data-dragging="true"]) {
+  transform: scale(1);
+}
+
+.sortable-item:not([data-dragging="true"]):hover {
+  transform: scale(1.02);
+}
+```
+
+```tsx
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging, isDropTarget} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      className="sortable-item"
+      data-dragging={isDragging || undefined}
+      data-drop-target={isDropTarget || undefined}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+## CSS Layers Support
+
+Dnd-kit works seamlessly with CSS layers:
+
+```css
+@layer base, components;
+
+@layer base {
+  .sortable {
+    padding: 12px 20px;
+    border: 2px solid #4c9ffe;
+    border-radius: 8px;
+    background: #e8f0fe;
+  }
+}
+
+@layer components {
+  .sortable[data-shadow="true"] {
+    opacity: 0.6;
+  }
+}
+```
+
+## Performance Optimization
+
+The library automatically optimizes animations:
+
+### Transform-Based Movement
+
+Animations use CSS `translate` instead of `top`/`left` for better performance:
+
+```typescript
+// Good: GPU-accelerated
+animateTransform({
+  element,
+  keyframes: {
+    translate: ['100px 0px', '0px 0px'],
+  },
+});
+```
+
+### Canceling CSS Transitions
+
+The library cancels conflicting CSS transitions before measuring:
+
+```typescript
+for (const animation of element.getAnimations()) {
+  if (
+    'transitionProperty' in animation &&
+    (animation.transitionProperty === 'transform' ||
+     animation.transitionProperty === 'translate' ||
+     animation.transitionProperty === 'scale')
+  ) {
+    animation.cancel();
+  }
+}
+```
+
+This prevents incorrect position calculations during transitions.
+
+## Reduced Motion Support
+
+The library automatically respects user motion preferences:
+
+```typescript
+if (prefersReducedMotion(window)) {
+  transition = {...transition, duration: 0};
+}
+```
+
+You can also detect this manually:
+
+```tsx
+function useReducedMotion() {
+  const [prefersReduced, setPrefersReduced] = useState(
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = () => setPrefersReduced(mediaQuery.matches);
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return prefersReduced;
+}
+
+function SortableItem({id, index}) {
+  const reducedMotion = useReducedMotion();
+  
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    transition: reducedMotion ? {duration: 0} : {duration: 250},
+  });
+}
+```
+
+<Tip>
+Always respect `prefers-reduced-motion` for accessibility. Users with vestibular disorders rely on this setting.
+</Tip>
+
+## Advanced: Custom Animation Hook
+
+Create a reusable hook for consistent animations:
+
+```tsx
+function useSortableAnimation({
+  preset = 'default',
+  customDuration,
+  customEasing,
+} = {}) {
+  const presets = {
+    default: {
+      duration: 250,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    },
+    fast: {
+      duration: 150,
+      easing: 'ease-out',
+    },
+    smooth: {
+      duration: 400,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    },
+    bouncy: {
+      duration: 500,
+      easing: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+    },
+  };
+
+  const reducedMotion = useReducedMotion();
+  const baseTransition = presets[preset];
+
+  return {
+    duration: reducedMotion ? 0 : (customDuration ?? baseTransition.duration),
+    easing: customEasing ?? baseTransition.easing,
+    idle: false,
+  };
+}
+
+// Usage
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const transition = useSortableAnimation({preset: 'smooth'});
+  
+  const {isDragging} = useSortable({id, index, element, transition});
+  
+  return <div ref={setElement}>{id}</div>;
+}
+```
+
+## Next Steps
+
+<Steps>
+  <Step title="Experiment with Easing">
+    Try different easing functions to find the right feel for your interface
+  </Step>
+  
+  <Step title="Test Performance">
+    Profile animations with large lists to ensure smooth 60fps rendering
+  </Step>
+  
+  <Step title="Add Visual Feedback">
+    Combine transitions with [accessibility features](/guides/accessibility) for comprehensive UX
+  </Step>
+</Steps>

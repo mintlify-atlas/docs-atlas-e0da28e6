@@ -1,0 +1,562 @@
+---
+title: Vue
+description: Use dnd-kit with Vue 3 applications
+---
+
+## Overview
+
+The Vue adapter provides composables and components that integrate drag and drop functionality into your Vue 3 applications with full TypeScript support and reactivity.
+
+## Installation
+
+Install the Vue package and its dependencies:
+
+<CodeGroup>
+```bash npm
+npm install @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash yarn
+yarn add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash pnpm
+pnpm add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+```
+
+```bash bun
+bun add @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+```
+</CodeGroup>
+
+<Info>
+  **Requirements**: Vue 3.5.0 or higher
+</Info>
+
+## Getting Started
+
+<Steps>
+  <Step title="Add DragDropProvider">
+    Wrap your application with the `DragDropProvider` component:
+
+    ```vue
+    <script setup>
+    import DragDropProvider from '@dnd-kit/vue';
+    </script>
+
+    <template>
+      <DragDropProvider>
+        <!-- Your app content -->
+      </DragDropProvider>
+    </template>
+    ```
+  </Step>
+
+  <Step title="Create draggable components">
+    Use the `useDraggable` composable to make elements draggable:
+
+    ```vue
+    <script setup>
+    import {useDraggable} from '@dnd-kit/vue';
+
+    const props = defineProps(['id', 'title']);
+
+    const {draggable, isDragging} = useDraggable({
+      id: props.id,
+      data: {title: props.title},
+    });
+    </script>
+
+    <template>
+      <div :ref="draggable.element" :style="{opacity: isDragging ? 0.5 : 1}">
+        {{ title }}
+      </div>
+    </template>
+    ```
+  </Step>
+
+  <Step title="Create droppable zones">
+    Use the `useDroppable` composable to create drop targets:
+
+    ```vue
+    <script setup>
+    import {useDroppable} from '@dnd-kit/vue';
+
+    const props = defineProps(['id']);
+
+    const {droppable, isDropTarget} = useDroppable({id: props.id});
+    </script>
+
+    <template>
+      <div
+        :ref="droppable.element"
+        :style="{
+          backgroundColor: isDropTarget ? 'lightblue' : 'transparent',
+        }"
+      >
+        <slot />
+      </div>
+    </template>
+    ```
+  </Step>
+
+  <Step title="Handle drag events">
+    Listen to events via the provider emits:
+
+    ```vue
+    <script setup>
+    import DragDropProvider from '@dnd-kit/vue';
+
+    const handleDragEnd = (event) => {
+      const {source, target} = event.operation;
+      console.log('Dropped', source.id, 'on', target?.id);
+    };
+    </script>
+
+    <template>
+      <DragDropProvider @dragEnd="handleDragEnd">
+        <!-- Your components -->
+      </DragDropProvider>
+    </template>
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a full drag and drop implementation:
+
+```vue
+<script setup>
+import {ref} from 'vue';
+import DragDropProvider from '@dnd-kit/vue';
+import {useDraggable, useDroppable} from '@dnd-kit/vue';
+
+const zones = ref({
+  'zone-1': [
+    {id: 'item-1', label: 'Item 1'},
+    {id: 'item-2', label: 'Item 2'},
+  ],
+  'zone-2': [
+    {id: 'item-3', label: 'Item 3'},
+  ],
+});
+
+const handleDragEnd = (event) => {
+  const {source, target} = event.operation;
+  
+  if (!target) return;
+
+  // Remove from all zones
+  for (const zoneId in zones.value) {
+    zones.value[zoneId] = zones.value[zoneId].filter(
+      (item) => item.id !== source.id
+    );
+  }
+  
+  // Add to target zone
+  zones.value[target.id].push(source.data);
+};
+</script>
+
+<template>
+  <DragDropProvider @dragEnd="handleDragEnd">
+    <div style="display: flex; gap: 16px; padding: 24px">
+      <DroppableZone
+        v-for="(items, zoneId) in zones"
+        :key="zoneId"
+        :id="zoneId"
+        :title="`Zone ${zoneId.split('-')[1]}`"
+        :items="items"
+      />
+    </div>
+  </DragDropProvider>
+</template>
+```
+
+```vue
+<!-- DraggableItem.vue -->
+<script setup>
+import {useDraggable} from '@dnd-kit/vue';
+
+const props = defineProps(['id', 'label']);
+
+const {draggable, isDragging, isDragSource} = useDraggable({
+  id: props.id,
+  data: {label: props.label},
+});
+</script>
+
+<template>
+  <div
+    :ref="draggable.element"
+    :style="{
+      padding: '16px',
+      margin: '8px',
+      backgroundColor: isDragging ? '#e3f2fd' : '#f5f5f5',
+      border: isDragSource ? '2px solid #2196f3' : '1px solid #ddd',
+      borderRadius: '4px',
+      cursor: 'grab',
+    }"
+  >
+    {{ label }}
+  </div>
+</template>
+```
+
+```vue
+<!-- DroppableZone.vue -->
+<script setup>
+import {useDroppable} from '@dnd-kit/vue';
+import DraggableItem from './DraggableItem.vue';
+
+const props = defineProps(['id', 'title', 'items']);
+
+const {droppable, isDropTarget} = useDroppable({id: props.id});
+</script>
+
+<template>
+  <div
+    :ref="droppable.element"
+    :style="{
+      minHeight: '200px',
+      padding: '16px',
+      margin: '8px',
+      backgroundColor: isDropTarget ? '#e8f5e9' : '#fafafa',
+      border: '2px dashed #ccc',
+      borderRadius: '8px',
+    }"
+  >
+    <h3>{{ title }}</h3>
+    <DraggableItem
+      v-for="item in items"
+      :key="item.id"
+      :id="item.id"
+      :label="item.label"
+    />
+  </div>
+</template>
+```
+
+## Sortable Lists
+
+Create sortable lists with the `useSortable` composable:
+
+```vue
+<script setup>
+import {ref} from 'vue';
+import DragDropProvider from '@dnd-kit/vue';
+import {useSortable} from '@dnd-kit/vue/sortable';
+
+const items = ref([
+  {id: '1', label: 'Item 1'},
+  {id: '2', label: 'Item 2'},
+  {id: '3', label: 'Item 3'},
+  {id: '4', label: 'Item 4'},
+]);
+
+const handleDragEnd = (event) => {
+  const {source, target} = event.operation;
+  
+  if (!target || source.index === target.index) return;
+
+  const newItems = [...items.value];
+  const [removed] = newItems.splice(source.index, 1);
+  newItems.splice(target.index, 0, removed);
+  items.value = newItems;
+};
+</script>
+
+<template>
+  <DragDropProvider @dragEnd="handleDragEnd">
+    <div style="max-width: 400px; padding: 24px">
+      <SortableItem
+        v-for="(item, index) in items"
+        :key="item.id"
+        :id="item.id"
+        :index="index"
+        :label="item.label"
+      />
+    </div>
+  </DragDropProvider>
+</template>
+```
+
+```vue
+<!-- SortableItem.vue -->
+<script setup>
+import {useSortable} from '@dnd-kit/vue/sortable';
+
+const props = defineProps(['id', 'index', 'label']);
+
+const {sortable, isDragging, isDragSource} = useSortable({
+  id: props.id,
+  index: props.index,
+  group: 'list',
+  data: {label: props.label},
+});
+</script>
+
+<template>
+  <div
+    :ref="sortable.element"
+    :style="{
+      padding: '12px',
+      margin: '4px 0',
+      backgroundColor: isDragging ? '#e3f2fd' : 'white',
+      border: isDragSource ? '2px solid #2196f3' : '1px solid #ddd',
+      borderRadius: '4px',
+      cursor: 'grab',
+    }"
+  >
+    {{ label }}
+  </div>
+</template>
+```
+
+## Composable APIs
+
+### useDraggable
+
+The `useDraggable` composable signature from `/home/daytona/workspace/source/packages/vue/src/core/draggable/useDraggable.ts:17`:
+
+```typescript
+function useDraggable<T extends Data = Data>(
+  input: UseDraggableInput<T>
+): {
+  draggable: Readonly<Ref<Draggable<T>>>;
+  isDragging: ComputedRef<boolean>;
+  isDropping: ComputedRef<boolean>;
+  isDragSource: ComputedRef<boolean>;
+}
+
+interface UseDraggableInput<T extends Data = Data> {
+  id: MaybeRefOrGetter<string>;
+  element?: MaybeRefOrGetter<MaybeElement>;
+  handle?: MaybeRefOrGetter<MaybeElement>;
+  data?: MaybeRefOrGetter<T>;
+  disabled?: MaybeRefOrGetter<boolean>;
+  modifiers?: MaybeRefOrGetter<Modifier[]>;
+  sensors?: MaybeRefOrGetter<Sensor[]>;
+  plugins?: MaybeRefOrGetter<Plugin[]>;
+  alignment?: MaybeRefOrGetter<Alignment>;
+}
+```
+
+### useDroppable
+
+The `useDroppable` composable signature from `/home/daytona/workspace/source/packages/vue/src/core/droppable/useDroppable.ts:16`:
+
+```typescript
+function useDroppable<T extends Data = Data>(
+  input: UseDroppableInput<T>
+): {
+  droppable: Readonly<Ref<Droppable<T>>>;
+  isDropTarget: ComputedRef<boolean>;
+}
+
+interface UseDroppableInput<T extends Data = Data> {
+  id: MaybeRefOrGetter<string>;
+  element?: MaybeRefOrGetter<MaybeElement>;
+  data?: MaybeRefOrGetter<T>;
+  disabled?: MaybeRefOrGetter<boolean>;
+  accept?: MaybeRefOrGetter<string | string[]>;
+  type?: MaybeRefOrGetter<string>;
+  collisionDetector?: MaybeRefOrGetter<CollisionDetector>;
+}
+```
+
+### useSortable
+
+The `useSortable` composable signature from `/home/daytona/workspace/source/packages/vue/src/sortable/useSortable.ts:28`:
+
+```typescript
+function useSortable<T extends Data = Data>(
+  input: UseSortableInput<T>
+): {
+  sortable: Readonly<Ref<Sortable<T>>>;
+  isDragging: ComputedRef<boolean>;
+  isDropping: ComputedRef<boolean>;
+  isDragSource: ComputedRef<boolean>;
+  isDropTarget: ComputedRef<boolean>;
+}
+
+interface UseSortableInput<T extends Data = Data> {
+  id: MaybeRefOrGetter<string>;
+  group: MaybeRefOrGetter<string>;
+  index: MaybeRefOrGetter<number>;
+  element?: MaybeRefOrGetter<MaybeElement>;
+  handle?: MaybeRefOrGetter<MaybeElement>;
+  target?: MaybeRefOrGetter<MaybeElement>;
+  data?: MaybeRefOrGetter<T>;
+  disabled?: MaybeRefOrGetter<boolean>;
+  type?: MaybeRefOrGetter<string>;
+  accept?: MaybeRefOrGetter<string | string[]>;
+  modifiers?: MaybeRefOrGetter<Modifier[]>;
+  sensors?: MaybeRefOrGetter<Sensor[]>;
+  plugins?: MaybeRefOrGetter<Plugin[]>;
+  collisionDetector?: MaybeRefOrGetter<CollisionDetector>;
+  collisionPriority?: MaybeRefOrGetter<number>;
+  transition?: MaybeRefOrGetter<SortableTransition>;
+  alignment?: MaybeRefOrGetter<Alignment>;
+}
+```
+
+## Advanced Features
+
+### Drag Handles
+
+Use separate elements for dragging:
+
+```vue
+<script setup>
+import {useDraggable} from '@dnd-kit/vue';
+import {ref} from 'vue';
+
+const props = defineProps(['id', 'title']);
+
+const handleRef = ref();
+
+const {draggable, isDragging} = useDraggable({
+  id: props.id,
+  handle: handleRef,
+});
+</script>
+
+<template>
+  <div :ref="draggable.element" :style="{opacity: isDragging ? 0.5 : 1}">
+    <div ref="handleRef" style="cursor: grab; padding: 8px">☰</div>
+    <div>{{ title }}</div>
+  </div>
+</template>
+```
+
+### Modifiers
+
+Constrain drag behavior:
+
+```vue
+<script setup>
+import DragDropProvider from '@dnd-kit/vue';
+import {restrictToVerticalAxis} from '@dnd-kit/abstract/modifiers';
+
+const modifiers = [restrictToVerticalAxis];
+</script>
+
+<template>
+  <DragDropProvider :modifiers="modifiers">
+    <!-- Content -->
+  </DragDropProvider>
+</template>
+```
+
+### Sensors
+
+Customize activation:
+
+```vue
+<script setup>
+import DragDropProvider from '@dnd-kit/vue';
+import {PointerSensor} from '@dnd-kit/dom';
+
+const sensors = [
+  new PointerSensor({
+    activationConstraint: {
+      delay: 250,
+      tolerance: 5,
+    },
+  }),
+];
+</script>
+
+<template>
+  <DragDropProvider :sensors="sensors">
+    <!-- Content -->
+  </DragDropProvider>
+</template>
+```
+
+### Type Safety
+
+Define custom data types:
+
+```vue
+<script setup lang="ts">
+import {useDraggable} from '@dnd-kit/vue';
+
+interface TaskData {
+  id: string;
+  title: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+const props = defineProps<{task: TaskData}>();
+
+const {draggable, isDragging} = useDraggable<TaskData>({
+  id: props.task.id,
+  data: props.task,
+});
+</script>
+
+<template>
+  <div :ref="draggable.element">
+    <h3>{{ task.title }}</h3>
+    <span>Priority: {{ task.priority }}</span>
+  </div>
+</template>
+```
+
+## Reactivity
+
+All inputs to composables support reactive values:
+
+```vue
+<script setup>
+import {ref, computed} from 'vue';
+import {useDraggable} from '@dnd-kit/vue';
+
+const props = defineProps(['id']);
+const isDisabled = ref(false);
+const label = computed(() => `Item ${props.id}`);
+
+const {draggable, isDragging} = useDraggable({
+  id: props.id,
+  disabled: isDisabled, // Reactive!
+  data: {label}, // Computed values work!
+});
+</script>
+
+<template>
+  <div :ref="draggable.element">
+    {{ label }}
+    <button @click="isDisabled = !isDisabled">
+      {{ isDisabled ? 'Enable' : 'Disable' }}
+    </button>
+  </div>
+</template>
+```
+
+## Best Practices
+
+- **Stable IDs**: Use consistent, unique IDs for draggables and droppables
+- **Reactive inputs**: Leverage Vue's reactivity for dynamic behavior
+- **Template refs**: Properly assign refs to element properties
+- **Computed values**: Use computed for derived drag/drop states
+- **Performance**: Use `v-memo` for large sortable lists
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sortable Lists" icon="list" href="/guides/sortable">
+    Build sortable lists with animations
+  </Card>
+  <Card title="Multiple Containers" icon="grid" href="/examples/multiple-containers">
+    Drag between multiple containers
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/concepts/sensors">
+    Configure interaction methods
+  </Card>
+  <Card title="Events" icon="bolt" href="/api/abstract/drag-drop-manager#events">
+    Handle drag and drop events
+  </Card>
+</CardGroup>

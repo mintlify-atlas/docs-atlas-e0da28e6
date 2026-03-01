@@ -1,0 +1,606 @@
+---
+title: Nested Drag Contexts
+description: Master complex drag and drop hierarchies with nested contexts, sortable lists, and tree structures
+---
+
+## Overview
+
+Nested drag contexts enable sophisticated drag and drop interactions like sortable lists with multiple levels, tree structures, and kanban boards where both columns and cards are draggable. This guide covers advanced patterns for building hierarchical drag and drop interfaces.
+
+## What You'll Build
+
+A nested drag and drop interface featuring:
+- Multiple sortable containers that can themselves be reordered
+- Items that can be dragged between containers
+- Different drag types (containers vs. items)
+- Proper collision detection for nested elements
+- Real-time visual feedback at multiple levels
+
+## Prerequisites
+
+You should be comfortable with:
+- [Simple Drag and Drop](/examples/simple-drag-drop) basics
+- [Multiple Containers](/examples/multiple-containers) patterns
+- React hooks and state management
+
+## Core Concepts
+
+### Drag Types and Groups
+
+When working with nested contexts, you need to distinguish between different types of draggable elements:
+
+```tsx
+useSortable({
+  id: 'column-1',
+  type: 'column',      // This is a column
+  accept: ['column', 'item'],  // Can accept both types
+  index: 0
+});
+
+useSortable({
+  id: 'item-1',
+  type: 'item',        // This is an item
+  accept: 'item',      // Only accepts items
+  group: 'column-1',   // Belongs to column-1
+  index: 0
+});
+```
+
+**Key concepts:**
+- `type` identifies what kind of element this is
+- `accept` defines what types can be dropped onto this element
+- `group` links items to their parent container
+- Different types can have different collision priorities
+
+### Collision Priority
+
+Nested elements need different collision priorities to ensure proper drop targets:
+
+```tsx
+import { CollisionPriority } from '@dnd-kit/abstract';
+
+// Container has low priority
+useSortable({
+  id: 'column-1',
+  collisionPriority: CollisionPriority.Low,
+  type: 'column'
+});
+
+// Items have normal/high priority
+useSortable({
+  id: 'item-1',
+  type: 'item'
+  // Default priority is higher than Low
+});
+```
+
+This ensures that when dragging over nested elements, items take precedence over their containers.
+
+## Implementation
+
+<Steps>
+
+### Set Up Multi-Level State
+
+Structure your state to represent the hierarchy:
+
+```tsx
+import { useState } from 'react';
+
+function App() {
+  // State: container ID -> array of item IDs
+  const [items, setItems] = useState({
+    A: ['A1', 'A2', 'A3'],
+    B: ['B1', 'B2', 'B3'],
+    C: ['C1', 'C2', 'C3'],
+    D: []
+  });
+  
+  // Column order
+  const [columns] = useState(['A', 'B', 'C', 'D']);
+}
+```
+
+### Create Sortable Items
+
+Items that can be sorted within and moved between containers:
+
+```tsx
+import { useSortable } from '@dnd-kit/react/sortable';
+import { Feedback } from '@dnd-kit/dom';
+
+function SortableItem({
+  id,
+  column,
+  index
+}: {
+  id: string;
+  column: string;
+  index: number;
+}) {
+  const { handleRef, ref, isDragging } = useSortable({
+    id,
+    group: column,        // Items belong to a column group
+    accept: 'item',       // Only accept other items
+    type: 'item',         // This is an item type
+    index,
+    data: { group: column },  // Store group info
+    plugins: [
+      Feedback.configure({ feedback: 'clone' })  // Show clone during drag
+    ]
+  });
+
+  return (
+    <div
+      ref={ref}
+      className="item"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      {id}
+      <button ref={handleRef} className="handle" aria-label="Drag handle">
+        ⋮⋮
+      </button>
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- `group` links the item to its parent container
+- `handleRef` provides a drag handle (optional)
+- `Feedback.configure` creates a visual clone during dragging
+- Store the group in `data` for use in drag handlers
+
+### Create Sortable Columns
+
+Columns that contain items and can themselves be reordered:
+
+```tsx
+import { CollisionPriority } from '@dnd-kit/abstract';
+
+function SortableColumn({
+  id,
+  index,
+  items
+}: {
+  id: string;
+  index: number;
+  items: string[];
+}) {
+  const { handleRef, ref, isDragging } = useSortable({
+    id,
+    accept: ['column', 'item'],  // Can accept both columns and items
+    collisionPriority: CollisionPriority.Low,  // Lower priority than items
+    type: 'column',
+    index
+  });
+
+  return (
+    <div
+      ref={ref}
+      className="column"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      <h2>
+        {id}
+        <button ref={handleRef} className="handle" aria-label="Drag column">
+          ⋮⋮
+        </button>
+      </h2>
+      <ul className="items-list">
+        {items.map((itemId, itemIndex) => (
+          <SortableItem
+            key={itemId}
+            id={itemId}
+            column={id}
+            index={itemIndex}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- Accepts both 'column' and 'item' types
+- Low collision priority lets nested items take precedence
+- Contains the list of sortable items
+
+### Handle Multi-Level Drag Operations
+
+Manage drag operations for both columns and items:
+
+```tsx
+import { DragDropProvider } from '@dnd-kit/react';
+import { move } from '@dnd-kit/helpers';
+import { useCallback, useRef } from 'react';
+
+function App() {
+  const [items, setItems] = useState({
+    A: ['A1', 'A2', 'A3'],
+    B: ['B1', 'B2', 'B3'],
+    C: ['C1', 'C2', 'C3'],
+    D: []
+  });
+  const [columns] = useState(Object.keys(items));
+  const snapshot = useRef(structuredClone(items));
+
+  return (
+    <DragDropProvider
+      onDragStart={useCallback(() => {
+        // Save snapshot for potential cancellation
+        snapshot.current = structuredClone(items);
+      }, [items])}
+      
+      onDragOver={useCallback((event) => {
+        const { source } = event.operation;
+
+        // Don't move columns during drag over
+        if (source && source.type === 'column') {
+          return;
+        }
+
+        // Move items in real-time
+        setItems((items) => move(items, event));
+      }, [])}
+      
+      onDragEnd={useCallback((event) => {
+        if (event.canceled) {
+          // Restore from snapshot
+          setItems(snapshot.current);
+          return;
+        }
+
+        const { source } = event.operation;
+
+        // Handle column reordering if needed
+        if (source?.type === 'column') {
+          // Implement column reordering logic
+        }
+      }, [])}
+    >
+      <div className="board">
+        {columns.map((column, columnIndex) => (
+          <SortableColumn
+            key={column}
+            id={column}
+            index={columnIndex}
+            items={items[column]}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+**Key concepts:**
+- `onDragStart` captures a snapshot for cancellation
+- `onDragOver` provides real-time updates (only for items)
+- `onDragEnd` finalizes the operation or restores from snapshot
+- Check `source.type` to handle different draggable types differently
+- Use the `move` helper for automatic state updates
+
+### Add Drag Handles
+
+Drag handles provide better control in complex nested layouts:
+
+```tsx
+function SortableItem({ id, column, index }: Props) {
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const [element, setElement] = useState<Element | null>(null);
+  
+  const { isDragging } = useSortable({
+    id,
+    index,
+    element,              // The draggable element
+    handle: handleRef,    // Only drag via this handle
+    group: column,
+    type: 'item'
+  });
+
+  return (
+    <div ref={setElement} className="item">
+      {id}
+      <button 
+        ref={handleRef} 
+        className="handle"
+        aria-label="Drag handle"
+      >
+        ⋮⋮
+      </button>
+    </div>
+  );
+}
+```
+
+**Key concepts:**
+- Separate `element` (the draggable) from `handle` (the grabber)
+- Users must click the handle to start dragging
+- Useful in complex layouts with clickable content
+
+</Steps>
+
+## Complete Example
+
+Here's a complete multi-level sortable implementation:
+
+```tsx
+import React, { memo, useCallback, useRef, useState } from 'react';
+import { CollisionPriority } from '@dnd-kit/abstract';
+import { DragDropProvider } from '@dnd-kit/react';
+import { useSortable } from '@dnd-kit/react/sortable';
+import { move } from '@dnd-kit/helpers';
+import { Feedback } from '@dnd-kit/dom';
+
+function createRange(length: number) {
+  return Array.from({ length }, (_, i) => i + 1);
+}
+
+const SortableItem = memo(function SortableItem({
+  id,
+  column,
+  index
+}: {
+  id: string;
+  column: string;
+  index: number;
+}) {
+  const { handleRef, ref, isDragging } = useSortable({
+    id,
+    group: column,
+    accept: 'item',
+    type: 'item',
+    plugins: [Feedback.configure({ feedback: 'clone' })],
+    index,
+    data: { group: column }
+  });
+
+  return (
+    <div
+      ref={ref}
+      className="item"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      {id}
+      <button ref={handleRef} className="handle">⋮⋮</button>
+    </div>
+  );
+});
+
+const SortableColumn = memo(function SortableColumn({
+  id,
+  index,
+  items
+}: {
+  id: string;
+  index: number;
+  items: string[];
+}) {
+  const { handleRef, ref, isDragging } = useSortable({
+    id,
+    accept: ['column', 'item'],
+    collisionPriority: CollisionPriority.Low,
+    type: 'column',
+    index
+  });
+
+  return (
+    <div
+      ref={ref}
+      className="column"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      <h2>
+        Column {id}
+        <button ref={handleRef} className="handle">⋮⋮</button>
+      </h2>
+      <ul>
+        {items.map((itemId, itemIndex) => (
+          <SortableItem
+            key={itemId}
+            id={itemId}
+            column={id}
+            index={itemIndex}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+});
+
+export default function App() {
+  const [items, setItems] = useState({
+    A: createRange(6).map((id) => `A${id}`),
+    B: createRange(6).map((id) => `B${id}`),
+    C: createRange(6).map((id) => `C${id}`),
+    D: []
+  });
+  const [columns] = useState(Object.keys(items));
+  const snapshot = useRef(structuredClone(items));
+
+  return (
+    <DragDropProvider
+      onDragStart={useCallback(() => {
+        snapshot.current = structuredClone(items);
+      }, [items])}
+      onDragOver={useCallback((event) => {
+        const { source } = event.operation;
+        if (source && source.type === 'column') return;
+        setItems((items) => move(items, event));
+      }, [])}
+      onDragEnd={useCallback((event) => {
+        if (event.canceled) {
+          setItems(snapshot.current);
+        }
+      }, [])}
+    >
+      <div className="board">
+        {columns.map((column, columnIndex) => (
+          <SortableColumn
+            key={column}
+            id={column}
+            index={columnIndex}
+            items={items[column]}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Styling
+
+```css
+.board {
+  display: flex;
+  gap: 16px;
+  padding: 40px;
+  overflow-x: auto;
+}
+
+.column {
+  flex: 0 0 280px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  transition: opacity 0.2s;
+}
+
+.column h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.column ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.handle {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: grab;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.handle:hover {
+  color: #333;
+}
+```
+
+## Advanced Patterns
+
+### Tree Structures
+
+For tree structures with indefinite nesting, track depth and parent relationships:
+
+```tsx
+interface TreeItem {
+  id: string;
+  depth: number;
+  parentId?: string;
+  children: TreeItem[];
+}
+
+function TreeNode({ item, index }: { item: TreeItem; index: number }) {
+  const { ref, isDragging } = useSortable({
+    id: item.id,
+    index,
+    data: { depth: item.depth, parentId: item.parentId }
+  });
+  
+  return (
+    <li ref={ref} style={{ paddingLeft: item.depth * 20 }}>
+      {item.id}
+      {item.children.length > 0 && (
+        <ul>
+          {item.children.map((child, i) => (
+            <TreeNode key={child.id} item={child} index={i} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+```
+
+### Custom Sensors
+
+Configure sensors for better control:
+
+```tsx
+import { PointerSensor, KeyboardSensor } from '@dnd-kit/dom';
+
+const sensors = [
+  PointerSensor.configure({
+    activatorElements(source) {
+      // Only activate via element or handle
+      return [source.element, source.handle];
+    }
+  }),
+  KeyboardSensor
+];
+
+<DragDropProvider sensors={sensors}>
+  {/* Your components */}
+</DragDropProvider>
+```
+
+## Key Takeaways
+
+- Use `type` and `accept` to differentiate between draggable element types
+- Set `collisionPriority` to control which elements are prioritized as drop targets
+- The `group` property links items to their parent containers
+- Use `onDragOver` for real-time updates and `onDragEnd` for finalization
+- The `move` helper from `@dnd-kit/helpers` handles complex nested moves
+- Drag handles provide better UX in complex layouts
+- Store snapshots for reliable cancellation behavior
+- Separate column reordering logic from item moving logic
+
+## Performance Tips
+
+1. Use `React.memo` for sortable components to prevent unnecessary re-renders
+2. Use `useCallback` for event handlers to maintain referential equality
+3. Consider virtualization for large lists
+4. Avoid inline functions in render for better performance
+
+## Next Steps
+
+- Explore drag overlays for smoother visual feedback
+- Learn about custom collision detection algorithms
+- Implement keyboard navigation for accessibility
+- Add animations and transitions for polish

@@ -1,0 +1,579 @@
+---
+title: Geometry Utilities
+description: API reference for geometry utilities and classes in dnd-kit
+---
+
+The geometry package provides utilities for working with points, rectangles, positions, and distances in 2D space.
+
+## Point
+
+A class representing a location in a two-dimensional coordinate system.
+
+```typescript
+class Point implements Coordinates {
+  constructor(public x: number, public y: number)
+}
+```
+
+### Constructor
+
+<ParamField path="x" type="number" required>
+  Coordinate of the point on the horizontal axis
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  Coordinate of the point on the vertical axis
+</ParamField>
+
+### Static Methods
+
+#### Point.delta
+
+Returns the delta (difference) between two points.
+
+```typescript
+static delta(a: Point, b: Point): Point
+```
+
+<ParamField path="a" type="Point" required>
+  First point
+</ParamField>
+
+<ParamField path="b" type="Point" required>
+  Second point
+</ParamField>
+
+<ResponseField name="delta" type="Point">
+  A new Point representing the difference (a.x - b.x, a.y - b.y)
+</ResponseField>
+
+#### Point.distance
+
+Returns the distance (hypotenuse) between two points.
+
+```typescript
+static distance(a: Point, b: Point): number
+```
+
+<ParamField path="a" type="Point" required>
+  First point
+</ParamField>
+
+<ParamField path="b" type="Point" required>
+  Second point
+</ParamField>
+
+<ResponseField name="distance" type="number">
+  The Euclidean distance between the two points
+</ResponseField>
+
+#### Point.equals
+
+Returns true if both points have the same coordinates.
+
+```typescript
+static equals(a: Point, b: Point): boolean
+```
+
+<ParamField path="a" type="Point" required>
+  First point
+</ParamField>
+
+<ParamField path="b" type="Point" required>
+  Second point
+</ParamField>
+
+<ResponseField name="equals" type="boolean">
+  True if both points are equal
+</ResponseField>
+
+#### Point.from
+
+Creates a Point from coordinates.
+
+```typescript
+static from(coordinates: Coordinates): Point
+```
+
+<ParamField path="coordinates" type="Coordinates" required>
+  An object with `x` and `y` properties
+</ParamField>
+
+<ResponseField name="point" type="Point">
+  A new Point instance
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {Point} from '@dnd-kit/geometry';
+
+const point1 = new Point(10, 20);
+const point2 = new Point(30, 40);
+
+const delta = Point.delta(point1, point2);
+// Point { x: -20, y: -20 }
+
+const distance = Point.distance(point1, point2);
+// 28.284271247461902
+
+const areEqual = Point.equals(point1, point2);
+// false
+
+const point3 = Point.from({x: 5, y: 10});
+// Point { x: 5, y: 10 }
+```
+
+---
+
+## Rectangle
+
+A class representing a rectangular shape in 2D space.
+
+```typescript
+class Rectangle implements Shape {
+  constructor(
+    public left: number,
+    public top: number,
+    public width: number,
+    public height: number
+  )
+}
+```
+
+### Constructor
+
+<ParamField path="left" type="number" required>
+  The x-coordinate of the left edge
+</ParamField>
+
+<ParamField path="top" type="number" required>
+  The y-coordinate of the top edge
+</ParamField>
+
+<ParamField path="width" type="number" required>
+  The width of the rectangle
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  The height of the rectangle
+</ParamField>
+
+### Properties
+
+<ResponseField name="center" type="Point">
+  The center point of the rectangle
+</ResponseField>
+
+<ResponseField name="area" type="number">
+  The area of the rectangle (width × height)
+</ResponseField>
+
+<ResponseField name="bottom" type="number">
+  The y-coordinate of the bottom edge (top + height)
+</ResponseField>
+
+<ResponseField name="right" type="number">
+  The x-coordinate of the right edge (left + width)
+</ResponseField>
+
+<ResponseField name="aspectRatio" type="number">
+  The aspect ratio of the rectangle (width / height)
+</ResponseField>
+
+<ResponseField name="corners" type="Coordinates[]">
+  An array of the four corner coordinates
+</ResponseField>
+
+<ResponseField name="boundingRectangle" type="BoundingRectangle">
+  An object containing width, height, left, top, right, and bottom properties
+</ResponseField>
+
+<ResponseField name="scale" type="object">
+  The scale factors for x and y axes (default: `{x: 1, y: 1}`)
+</ResponseField>
+
+### Methods
+
+#### translate
+
+Translates the rectangle by the given offsets.
+
+```typescript
+translate(x: number, y: number): Rectangle
+```
+
+<ParamField path="x" type="number" required>
+  The x-axis offset
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  The y-axis offset
+</ParamField>
+
+<ResponseField name="rectangle" type="Rectangle">
+  A new Rectangle instance at the translated position
+</ResponseField>
+
+#### equals
+
+Checks if this rectangle is equal to another shape.
+
+```typescript
+equals(shape: Shape): boolean
+```
+
+<ParamField path="shape" type="Shape" required>
+  The shape to compare with
+</ParamField>
+
+<ResponseField name="equals" type="boolean">
+  True if the shapes are equal
+</ResponseField>
+
+#### containsPoint
+
+Checks if a point is contained within the rectangle.
+
+```typescript
+containsPoint(point: Point): boolean
+```
+
+<ParamField path="point" type="Point" required>
+  The point to check
+</ParamField>
+
+<ResponseField name="contains" type="boolean">
+  True if the point is inside the rectangle
+</ResponseField>
+
+#### intersectionArea
+
+Calculates the intersection area with another shape.
+
+```typescript
+intersectionArea(shape: Shape): number
+```
+
+<ParamField path="shape" type="Shape" required>
+  The shape to check intersection with
+</ParamField>
+
+<ResponseField name="area" type="number">
+  The area of intersection, or 0 if shapes don't intersect
+</ResponseField>
+
+#### intersectionRatio
+
+Calculates the intersection ratio with another shape.
+
+```typescript
+intersectionRatio(shape: Shape): number
+```
+
+<ParamField path="shape" type="Shape" required>
+  The shape to check intersection with
+</ParamField>
+
+<ResponseField name="ratio" type="number">
+  The intersection ratio calculated as: intersectionArea / (shapeArea + thisArea - intersectionArea)
+</ResponseField>
+
+### Static Methods
+
+#### Rectangle.from
+
+Creates a Rectangle from a BoundingRectangle.
+
+```typescript
+static from(rect: BoundingRectangle): Rectangle
+```
+
+<ParamField path="rect" type="BoundingRectangle" required>
+  An object with top, left, width, and height properties
+</ParamField>
+
+<ResponseField name="rectangle" type="Rectangle">
+  A new Rectangle instance
+</ResponseField>
+
+#### Rectangle.delta
+
+Calculates the delta between two rectangles based on alignment.
+
+```typescript
+static delta(
+  a: BoundingRectangle,
+  b: BoundingRectangle,
+  alignment?: Alignment
+): Point
+```
+
+<ParamField path="a" type="BoundingRectangle" required>
+  First rectangle
+</ParamField>
+
+<ParamField path="b" type="BoundingRectangle" required>
+  Second rectangle
+</ParamField>
+
+<ParamField path="alignment" type="Alignment" default="{x: 'center', y: 'center'}">
+  The alignment point to use for comparison. Can be 'start', 'center', or 'end' for each axis.
+</ParamField>
+
+<ResponseField name="delta" type="Point">
+  The delta between the aligned points of the two rectangles
+</ResponseField>
+
+#### Rectangle.intersectionRatio
+
+Calculates the intersection ratio between two rectangles.
+
+```typescript
+static intersectionRatio(a: BoundingRectangle, b: BoundingRectangle): number
+```
+
+<ParamField path="a" type="BoundingRectangle" required>
+  First rectangle
+</ParamField>
+
+<ParamField path="b" type="BoundingRectangle" required>
+  Second rectangle
+</ParamField>
+
+<ResponseField name="ratio" type="number">
+  The intersection ratio
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {Rectangle, Point} from '@dnd-kit/geometry';
+
+const rect = new Rectangle(0, 0, 100, 50);
+
+console.log(rect.center);
+// Point { x: 50, y: 25 }
+
+console.log(rect.area);
+// 5000
+
+console.log(rect.aspectRatio);
+// 2
+
+const translated = rect.translate(10, 20);
+// Rectangle { left: 10, top: 20, width: 100, height: 50 }
+
+const point = new Point(25, 25);
+console.log(rect.containsPoint(point));
+// true
+
+const rect2 = new Rectangle(50, 25, 100, 50);
+console.log(rect.intersectionArea(rect2));
+// 1250
+
+const delta = Rectangle.delta(
+  rect.boundingRectangle,
+  rect2.boundingRectangle,
+  {x: 'start', y: 'start'}
+);
+// Point { x: 50, y: 25 }
+```
+
+---
+
+## Position
+
+A class that tracks the current, previous, and initial positions with history and velocity tracking.
+
+```typescript
+class Position extends ValueHistory<Point> {
+  constructor(initialValue: Coordinates)
+}
+```
+
+### Constructor
+
+<ParamField path="initialValue" type="Coordinates" required>
+  The initial coordinates
+</ParamField>
+
+### Properties
+
+<ResponseField name="current" type="Point">
+  The current position
+</ResponseField>
+
+<ResponseField name="previous" type="Point | undefined">
+  The previous position, or undefined if not yet moved
+</ResponseField>
+
+<ResponseField name="initial" type="Point">
+  The initial position
+</ResponseField>
+
+<ResponseField name="delta" type="Point">
+  The delta between current and initial positions (computed)
+</ResponseField>
+
+<ResponseField name="direction" type="'up' | 'down' | 'left' | 'right' | null">
+  The direction of movement based on the delta between current and previous positions (computed)
+</ResponseField>
+
+<ResponseField name="velocity" type="Point">
+  The velocity in pixels per 100ms for x and y axes
+</ResponseField>
+
+### Methods
+
+#### reset
+
+Resets the position to initial or provided coordinates.
+
+```typescript
+reset(coordinates?: Coordinates): void
+```
+
+<ParamField path="coordinates" type="Coordinates">
+  Optional coordinates to reset to (defaults to initial value)
+</ParamField>
+
+### Usage Example
+
+```typescript
+import {Position} from '@dnd-kit/geometry';
+
+const position = new Position({x: 0, y: 0});
+
+position.current = {x: 10, y: 20};
+console.log(position.delta);
+// Point { x: 10, y: 20 }
+
+position.current = {x: 20, y: 20};
+console.log(position.direction);
+// 'right'
+
+console.log(position.velocity);
+// { x: ..., y: 0 }
+
+position.reset();
+console.log(position.current);
+// Point { x: 0, y: 0 }
+```
+
+---
+
+## exceedsDistance
+
+Returns true if a set of relative coordinates exceeds a given distance.
+
+```typescript
+function exceedsDistance(
+  coordinates: Coordinates,
+  distance: Distance
+): boolean
+```
+
+### Parameters
+
+<ParamField path="coordinates" type="Coordinates" required>
+  The coordinates to check (typically a delta)
+</ParamField>
+
+<ParamField path="distance" type="Distance" required>
+  The distance threshold. Can be:
+  - A number (Euclidean distance)
+  - An object with `x` and `y` properties (both axes must exceed)
+  - An object with only `x` (horizontal distance)
+  - An object with only `y` (vertical distance)
+</ParamField>
+
+### Returns
+
+<ResponseField name="exceeds" type="boolean">
+  True if the coordinates exceed the specified distance
+</ResponseField>
+
+### Usage Example
+
+```typescript
+import {exceedsDistance} from '@dnd-kit/geometry';
+
+const delta = {x: 10, y: 5};
+
+// Euclidean distance
+console.log(exceedsDistance(delta, 8));
+// true (distance is ~11.18)
+
+// Both axes must exceed
+console.log(exceedsDistance(delta, {x: 5, y: 5}));
+// true (x: 10 > 5 && y: 5 >= 5)
+
+// Only horizontal
+console.log(exceedsDistance(delta, {x: 15}));
+// false (10 < 15)
+
+// Only vertical
+console.log(exceedsDistance(delta, {y: 3}));
+// true (5 > 3)
+```
+
+---
+
+## Types
+
+### Coordinates
+
+```typescript
+type Coordinates = {
+  x: number;
+  y: number;
+};
+```
+
+### BoundingRectangle
+
+```typescript
+type BoundingRectangle = {
+  width: number;
+  height: number;
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+};
+```
+
+### Alignment
+
+```typescript
+type Alignment = {
+  x: 'start' | 'center' | 'end';
+  y: 'start' | 'center' | 'end';
+};
+```
+
+### Distance
+
+```typescript
+type Distance =
+  | number
+  | Coordinates
+  | Pick<Coordinates, 'x'>
+  | Pick<Coordinates, 'y'>;
+```
+
+### Axis
+
+```typescript
+enum Axis {
+  Horizontal = 'x',
+  Vertical = 'y',
+}
+
+enum Axes {
+  Both = 'both',
+  Horizontal = 'x',
+  Vertical = 'y',
+}
+```

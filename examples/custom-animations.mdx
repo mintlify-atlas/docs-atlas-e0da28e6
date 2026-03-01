@@ -1,0 +1,466 @@
+---
+title: Custom Animations
+description: Create sophisticated animations and visual feedback for drag and drop interactions
+---
+
+# Custom Animations
+
+The Feedback plugin in dnd-kit provides powerful animation capabilities through drop animations, transitions, and visual feedback customization. This guide shows you how to create custom animations for polished drag and drop experiences.
+
+## Understanding the Feedback Plugin
+
+The Feedback plugin manages the visual representation of draggable items during and after drag operations. It handles:
+
+- Drag feedback rendering (default, move, clone, or none)
+- Drop animations when items are released
+- Keyboard transition smoothing
+- Transform and positioning calculations
+
+## Drop Animations
+
+Drop animations control what happens when a draggable item is released.
+
+### Built-in Drop Animation
+
+The default drop animation smoothly returns items to their final position:
+
+```typescript packages/dom/src/core/plugins/feedback/Feedback.ts
+import {DragDropManager} from '@dnd-kit/dom';
+import {Feedback} from '@dnd-kit/dom/plugins';
+
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      dropAnimation: {
+        duration: 350,
+        easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+      },
+    }),
+  ],
+});
+```
+
+### Disabling Drop Animation
+
+Set `dropAnimation` to `null` to disable it entirely:
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      dropAnimation: null,
+    }),
+  ],
+});
+```
+
+### Per-Item Drop Animation
+
+Override drop animation settings for individual draggables:
+
+```typescript
+// Configure Feedback for a specific draggable
+const draggable = manager.registry.draggables.register(element, {
+  ...Feedback.configure({
+    dropAnimation: {
+      duration: 500,
+      easing: 'ease-out',
+    },
+  }),
+});
+
+// Or disable for a specific item
+const draggable2 = manager.registry.draggables.register(element2, {
+  ...Feedback.configure({
+    dropAnimation: null,
+  }),
+});
+```
+
+### Custom Drop Animation Function
+
+Create completely custom drop animations:
+
+```typescript
+import type {DropAnimation} from '@dnd-kit/dom/plugins';
+
+const customDropAnimation: DropAnimation = async ({
+  source,
+  element,
+  feedbackElement,
+  translate,
+  styles,
+  cleanup,
+  restoreFocus,
+}) => {
+  // Custom animation logic
+  const duration = 400;
+  
+  // Set initial animation state
+  styles.set(
+    {
+      transition: `all ${duration}ms cubic-bezier(0.68, -0.55, 0.265, 1.55)`,
+      translate: '0px 0px 0px',
+      opacity: 0.5,
+      scale: 0.8,
+    },
+    'dnd'
+  );
+
+  // Wait for animation to complete
+  await new Promise(resolve => setTimeout(resolve, duration));
+
+  // Cleanup and restore focus
+  cleanup();
+  restoreFocus();
+};
+
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      dropAnimation: customDropAnimation,
+    }),
+  ],
+});
+```
+
+## Keyboard Transitions
+
+When dragging with keyboard controls, smooth transitions make the experience feel more natural:
+
+```typescript packages/dom/src/core/plugins/feedback/Feedback.ts
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      keyboardTransition: {
+        duration: 250,
+        easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+      },
+    }),
+  ],
+});
+```
+
+Disable keyboard transitions:
+
+```typescript
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      keyboardTransition: null,
+    }),
+  ],
+});
+```
+
+## Feedback Types
+
+The Feedback plugin supports different visual feedback modes:
+
+### Default Feedback
+
+The draggable element moves with the cursor:
+
+```typescript
+const draggable = manager.registry.draggables.register(element, {
+  ...Feedback.configure({
+    feedback: 'default',
+  }),
+});
+```
+
+### Move Feedback
+
+The actual element moves without a placeholder:
+
+```typescript
+const draggable = manager.registry.draggables.register(element, {
+  ...Feedback.configure({
+    feedback: 'move',
+  }),
+});
+```
+
+### Clone Feedback
+
+Creates a visual clone while keeping the original in place:
+
+```typescript
+const draggable = manager.registry.draggables.register(element, {
+  ...Feedback.configure({
+    feedback: 'clone',
+  }),
+});
+```
+
+### No Feedback
+
+Disables visual feedback entirely:
+
+```typescript
+const draggable = manager.registry.draggables.register(element, {
+  ...Feedback.configure({
+    feedback: 'none',
+  }),
+});
+```
+
+## Advanced Animation Examples
+
+### Example 1: Bounce Drop Animation
+
+Create a playful bounce effect when items are dropped:
+
+```typescript
+const bounceDropAnimation: DropAnimation = async ({
+  source,
+  element,
+  styles,
+  cleanup,
+  restoreFocus,
+}) => {
+  const bounces = [
+    {offset: 0, scale: 1, opacity: 1},
+    {offset: 0.4, scale: 1.1, opacity: 0.9},
+    {offset: 0.6, scale: 0.95, opacity: 0.95},
+    {offset: 0.8, scale: 1.02, opacity: 0.98},
+    {offset: 1, scale: 1, opacity: 1},
+  ];
+
+  const animation = element.animate(
+    bounces.map(({offset, scale, opacity}) => ({
+      offset,
+      transform: `scale(${scale})`,
+      opacity: opacity.toString(),
+    })),
+    {
+      duration: 500,
+      easing: 'ease-out',
+    }
+  );
+
+  await animation.finished;
+  
+  cleanup();
+  restoreFocus();
+};
+```
+
+### Example 2: Fade and Shrink Animation
+
+```typescript
+const fadeAndShrinkAnimation: DropAnimation = async ({
+  element,
+  styles,
+  cleanup,
+  restoreFocus,
+}) => {
+  styles.set(
+    {
+      transition: 'all 300ms ease-in-out',
+      translate: '0px 0px 0px',
+      scale: '0.5',
+      opacity: '0',
+    },
+    'dnd'
+  );
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  // Reset for next use
+  styles.set(
+    {
+      scale: '1',
+      opacity: '1',
+    },
+    'dnd'
+  );
+
+  cleanup();
+  restoreFocus();
+};
+```
+
+### Example 3: Success/Error Animation
+
+Animate differently based on whether the drop was successful:
+
+```typescript
+const contextualDropAnimation: DropAnimation = async ({
+  source,
+  element,
+  styles,
+  cleanup,
+  restoreFocus,
+}) => {
+  // Check if dropped on a valid target
+  const manager = source.manager;
+  const hasValidTarget = manager.dragOperation.target !== null;
+
+  if (hasValidTarget) {
+    // Success: smooth ease-out
+    styles.set(
+      {
+        transition: 'all 300ms cubic-bezier(0.25, 1, 0.5, 1)',
+        translate: '0px 0px 0px',
+        opacity: '1',
+      },
+      'dnd'
+    );
+    await new Promise(resolve => setTimeout(resolve, 300));
+  } else {
+    // Error: shake and return
+    const shakeDuration = 400;
+    const shakeKeyframes = [
+      {transform: 'translateX(0px)'},
+      {transform: 'translateX(-10px)'},
+      {transform: 'translateX(10px)'},
+      {transform: 'translateX(-10px)'},
+      {transform: 'translateX(10px)'},
+      {transform: 'translateX(0px)'},
+    ];
+
+    await element.animate(shakeKeyframes, {
+      duration: shakeDuration,
+      easing: 'ease-in-out',
+    }).finished;
+
+    styles.set(
+      {
+        transition: 'all 200ms ease-out',
+        translate: '0px 0px 0px',
+      },
+      'dnd'
+    );
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  cleanup();
+  restoreFocus();
+};
+```
+
+### Example 4: Morphing Animation
+
+Smoothly morph the dragged element into its final position and size:
+
+```typescript
+const morphAnimation: DropAnimation = async ({
+  element,
+  feedbackElement,
+  placeholder,
+  styles,
+  cleanup,
+  restoreFocus,
+}) => {
+  // Get final position from placeholder if it exists
+  const finalElement = placeholder || element;
+  const finalRect = finalElement.getBoundingClientRect();
+  const currentRect = feedbackElement.getBoundingClientRect();
+
+  // Calculate the difference
+  const deltaX = finalRect.left - currentRect.left;
+  const deltaY = finalRect.top - currentRect.top;
+  const scaleX = finalRect.width / currentRect.width;
+  const scaleY = finalRect.height / currentRect.height;
+
+  // Apply the morph animation
+  const animation = feedbackElement.animate(
+    [
+      {
+        transform: 'translate(0, 0) scale(1)',
+      },
+      {
+        transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`,
+      },
+    ],
+    {
+      duration: 400,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      fill: 'forwards',
+    }
+  );
+
+  await animation.finished;
+
+  cleanup();
+  restoreFocus();
+};
+```
+
+## Custom Root Element
+
+Control where feedback elements are rendered:
+
+```typescript packages/dom/src/core/plugins/feedback/Feedback.ts
+const manager = new DragDropManager({
+  plugins: [
+    new Feedback(manager, {
+      rootElement: document.getElementById('drag-overlay-container'),
+    }),
+  ],
+});
+
+// Or use a function for dynamic root selection
+const manager2 = new DragDropManager({
+  plugins: [
+    new Feedback(manager2, {
+      rootElement: (source) => {
+        // Return different containers based on source type
+        const type = source.data.get('type');
+        return document.getElementById(`overlay-${type}`);
+      },
+    }),
+  ],
+});
+```
+
+## Respecting Reduced Motion
+
+The Feedback plugin automatically respects the user's reduced motion preferences. When `prefers-reduced-motion` is enabled, keyboard transitions are automatically disabled.
+
+You can also check this preference in custom animations:
+
+```typescript
+const respectfulDropAnimation: DropAnimation = async (props) => {
+  const {element, styles, cleanup, restoreFocus} = props;
+  
+  const prefersReducedMotion = window.matchMedia(
+    '(prefers-reduced-motion: reduce)'
+  ).matches;
+
+  if (prefersReducedMotion) {
+    // Skip animation
+    cleanup();
+    restoreFocus();
+    return;
+  }
+
+  // Normal animation
+  styles.set(
+    {
+      transition: 'all 300ms ease-out',
+      translate: '0px 0px 0px',
+    },
+    'dnd'
+  );
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+  cleanup();
+  restoreFocus();
+};
+```
+
+## Tips for Great Animations
+
+1. **Keep animations short**: 200-400ms is usually ideal for drag and drop interactions.
+
+2. **Use appropriate easing**: `cubic-bezier(0.25, 1, 0.5, 1)` provides natural-feeling motion.
+
+3. **Always call cleanup and restoreFocus**: These are essential for proper state management.
+
+4. **Test with keyboard navigation**: Ensure animations work well with keyboard controls.
+
+5. **Consider performance**: Use `transform` and `opacity` for best performance, as they can be hardware-accelerated.
+
+6. **Respect user preferences**: Always honor `prefers-reduced-motion` settings.

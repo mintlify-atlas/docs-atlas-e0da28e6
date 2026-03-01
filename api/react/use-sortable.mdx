@@ -1,0 +1,522 @@
+---
+title: 'useSortable'
+description: 'Hook to create sortable list items that combine draggable and droppable behaviors'
+---
+
+The `useSortable` hook combines draggable and droppable functionality to create sortable list items. It's specifically designed for building sortable lists, grids, and other reorderable collections.
+
+## Usage
+
+```tsx
+import {useSortable} from '@dnd-kit/react/sortable';
+
+function SortableItem({id, index, group}) {
+  const {ref, isDragging, isDropTarget} = useSortable({
+    id,
+    index,
+    group,
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        outline: isDropTarget ? '2px solid blue' : 'none',
+      }}
+    >
+      Item {id}
+    </div>
+  );
+}
+```
+
+## Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for this sortable item.
+
+  ```tsx
+  const {ref} = useSortable({id: 'item-1', index: 0, group: 'list'});
+  ```
+</ParamField>
+
+<ParamField path="index" type="number" required>
+  Current position of this item in the sortable list. This is used to calculate transitions and reordering.
+
+  ```tsx
+  const {ref} = useSortable({
+    id: item.id,
+    index: 0, // First item in the list
+    group: 'list',
+  });
+  ```
+</ParamField>
+
+<ParamField path="group" type="string" required>
+  Group identifier that links sortable items together. Items with the same group can be reordered among each other.
+
+  ```tsx
+  // Items in the same group can be sorted together
+  const {ref} = useSortable({
+    id: 'item-1',
+    index: 0,
+    group: 'my-list',
+  });
+  ```
+</ParamField>
+
+<ParamField path="element" type="Element | RefObject<Element>">
+  The DOM element for this sortable item. If not provided, use the `ref` from the return value.
+</ParamField>
+
+<ParamField path="handle" type="Element | RefObject<Element>">
+  A specific element to use as the drag handle. If provided, dragging can only be initiated from this element.
+
+  ```tsx
+  function SortableWithHandle() {
+    const {ref, handleRef} = useSortable({
+      id: 'item',
+      index: 0,
+      group: 'list',
+    });
+
+    return (
+      <div ref={ref}>
+        <div ref={handleRef} style={{cursor: 'grab'}}>⋮⋮</div>
+        <div>Content</div>
+      </div>
+    );
+  }
+  ```
+</ParamField>
+
+<ParamField path="target" type="Element | RefObject<Element>">
+  The target element for drop detection. Useful for sortable items with complex layouts where the drop target differs from the visual element.
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to this sortable item.
+
+  ```tsx
+  const {ref} = useSortable({
+    id: 'task-1',
+    index: 0,
+    group: 'tasks',
+    data: {label: 'Complete documentation', priority: 'high'},
+  });
+  ```
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Whether this sortable item is disabled. Disabled items cannot be dragged or act as drop targets.
+
+  ```tsx
+  const {ref} = useSortable({
+    id: 'item',
+    index: 0,
+    group: 'list',
+    disabled: isLocked,
+  });
+  ```
+</ParamField>
+
+<ParamField path="type" type="string">
+  Type identifier for this sortable. Can be used to restrict which items can be sorted together.
+</ParamField>
+
+<ParamField path="accept" type="string | string[]">
+  Type or types of draggables this sortable accepts as drop targets.
+
+  ```tsx
+  const {ref} = useSortable({
+    id: 'item',
+    index: 0,
+    group: 'list',
+    accept: ['task', 'subtask'],
+  });
+  ```
+</ParamField>
+
+<ParamField path="transition" type="TransitionConfig">
+  Animation configuration for the sortable transition effects.
+
+  ```tsx
+  const {ref} = useSortable({
+    id: 'item',
+    index: 0,
+    group: 'list',
+    transition: {
+      duration: 200,
+      easing: 'ease-in-out',
+    },
+  });
+  ```
+</ParamField>
+
+<ParamField path="collisionDetector" type="CollisionDetector">
+  Custom collision detection algorithm for this sortable.
+</ParamField>
+
+<ParamField path="collisionPriority" type="number">
+  Priority for collision detection when multiple sortables overlap. Higher values have higher priority.
+</ParamField>
+
+<ParamField path="sensors" type="Sensor[]">
+  Override the sensors for this specific sortable. By default, inherits from `DragDropProvider`.
+</ParamField>
+
+<ParamField path="modifiers" type="Modifier[]">
+  Modifiers that transform the position during drag. Applied in addition to provider-level modifiers.
+</ParamField>
+
+<ParamField path="plugins" type="Plugin[]">
+  Plugins specific to this sortable. Applied in addition to provider-level plugins.
+</ParamField>
+
+<ParamField path="alignment" type="{x: number, y: number}">
+  Alignment point for the drag source, relative to the element's position. Values are percentages (0-1).
+</ParamField>
+
+## Return Value
+
+<ResponseField name="ref" type="(element: Element | null) => void">
+  Callback ref to attach to the sortable element.
+
+  ```tsx
+  const {ref} = useSortable({id: 'item', index: 0, group: 'list'});
+  return <div ref={ref}>Sortable item</div>;
+  ```
+</ResponseField>
+
+<ResponseField name="handleRef" type="(element: Element | null) => void">
+  Callback ref to attach to a drag handle element.
+
+  ```tsx
+  const {ref, handleRef} = useSortable({id: 'item', index: 0, group: 'list'});
+  return (
+    <div ref={ref}>
+      <div ref={handleRef}>⋮⋮</div>
+    </div>
+  );
+  ```
+</ResponseField>
+
+<ResponseField name="targetRef" type="(element: Element | null) => void">
+  Callback ref to attach to the drop target element (if different from the main element).
+</ResponseField>
+
+<ResponseField name="sourceRef" type="(element: Element | null) => void">
+  Callback ref to attach to the drag source element (for advanced use cases).
+</ResponseField>
+
+<ResponseField name="sortable" type="Sortable<T>">
+  The underlying `Sortable` instance. Access this for advanced use cases.
+</ResponseField>
+
+<ResponseField name="isDragging" type="boolean">
+  Whether this element is currently being dragged.
+
+  ```tsx
+  const {ref, isDragging} = useSortable({id: 'item', index: 0, group: 'list'});
+  return (
+    <div ref={ref} style={{opacity: isDragging ? 0.5 : 1}}>
+      Item
+    </div>
+  );
+  ```
+</ResponseField>
+
+<ResponseField name="isDropping" type="boolean">
+  Whether this element is in the dropping animation phase.
+</ResponseField>
+
+<ResponseField name="isDragSource" type="boolean">
+  Whether this element is the source of the current drag operation.
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="boolean">
+  Whether this element is currently the target of a drag operation.
+
+  ```tsx
+  const {ref, isDropTarget} = useSortable({id: 'item', index: 0, group: 'list'});
+  return (
+    <div
+      ref={ref}
+      style={{outline: isDropTarget ? '2px solid blue' : 'none'}}
+    >
+      Item
+    </div>
+  );
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Sortable List
+
+```tsx
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {useState} from 'react';
+
+function SortableList() {
+  const [items, setItems] = useState(['A', 'B', 'C', 'D']);
+
+  const handleDragEnd = (event) => {
+    if (event.canceled) return;
+
+    const {source, target} = event.operation;
+    if (!target) return;
+
+    const sourceIndex = source.data.index;
+    const targetIndex = target.data.index;
+
+    setItems((prev) => {
+      const newItems = [...prev];
+      const [removed] = newItems.splice(sourceIndex, 1);
+      newItems.splice(targetIndex, 0, removed);
+      return newItems;
+    });
+  };
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div>
+        {items.map((item, index) => (
+          <SortableItem key={item} id={item} index={index} />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+
+function SortableItem({id, index}) {
+  const {ref, isDragging} = useSortable({
+    id,
+    index,
+    group: 'list',
+    data: {index}, // Store index for reordering
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '15px',
+        margin: '5px 0',
+        background: isDragging ? '#f0f0f0' : 'white',
+        border: '1px solid #ddd',
+        cursor: 'grab',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+### Sortable with Drag Handle
+
+```tsx
+function SortableWithHandle({id, index, label}) {
+  const {ref, handleRef, isDragging, isDropTarget} = useSortable({
+    id,
+    index,
+    group: 'tasks',
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '10px',
+        background: isDragging ? '#f0f0f0' : 'white',
+        border: isDropTarget ? '2px solid blue' : '1px solid #ddd',
+        marginBottom: '5px',
+      }}
+    >
+      <div
+        ref={handleRef}
+        style={{
+          marginRight: '10px',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          fontSize: '20px',
+        }}
+      >
+        ⋮⋮
+      </div>
+      <div style={{flex: 1}}>{label}</div>
+    </div>
+  );
+}
+```
+
+### Multiple Sortable Lists
+
+```tsx
+function MultipleList() {
+  const [listA, setListA] = useState(['A1', 'A2', 'A3']);
+  const [listB, setListB] = useState(['B1', 'B2', 'B3']);
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div style={{display: 'flex', gap: '20px'}}>
+        <div>
+          <h3>List A</h3>
+          {listA.map((id, index) => (
+            <SortableItem key={id} id={id} index={index} group="listA" />
+          ))}
+        </div>
+        <div>
+          <h3>List B</h3>
+          {listB.map((id, index) => (
+            <SortableItem key={id} id={id} index={index} group="listB" />
+          ))}
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+
+function SortableItem({id, index, group}) {
+  const {ref, isDragging} = useSortable({
+    id,
+    index,
+    group,
+    data: {group, index},
+  });
+
+  return <div ref={ref}>{id}</div>;
+}
+```
+
+### Sortable Grid
+
+```tsx
+function SortableGrid() {
+  const [items, setItems] = useState([
+    {id: '1', color: '#ff6b6b'},
+    {id: '2', color: '#4ecdc4'},
+    {id: '3', color: '#45b7d1'},
+    {id: '4', color: '#96ceb4'},
+    {id: '5', color: '#ffeaa7'},
+    {id: '6', color: '#dfe6e9'},
+  ]);
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '10px',
+        }}
+      >
+        {items.map((item, index) => (
+          <SortableGridItem
+            key={item.id}
+            id={item.id}
+            index={index}
+            color={item.color}
+          />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+
+function SortableGridItem({id, index, color}) {
+  const {ref, isDragging, isDropTarget} = useSortable({
+    id,
+    index,
+    group: 'grid',
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        height: '100px',
+        background: color,
+        borderRadius: '8px',
+        opacity: isDragging ? 0.5 : 1,
+        transform: isDropTarget ? 'scale(1.05)' : 'scale(1)',
+        transition: 'transform 0.2s',
+      }}
+    />
+  );
+}
+```
+
+### Sortable with Custom Transitions
+
+```tsx
+function SmoothSortable({id, index}) {
+  const {ref, isDragging} = useSortable({
+    id,
+    index,
+    group: 'smooth-list',
+    transition: {
+      duration: 300,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      idle: true, // Enable transitions when idle
+    },
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        padding: '20px',
+        background: 'white',
+        border: '1px solid #ddd',
+        opacity: isDragging ? 0.5 : 1,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+    >
+      Item {id}
+    </div>
+  );
+}
+```
+
+## Type Safety
+
+Use TypeScript generics to type the custom data:
+
+```tsx
+interface TaskData {
+  title: string;
+  priority: 'low' | 'medium' | 'high';
+  completed: boolean;
+}
+
+function SortableTask({task, index}: {task: TaskData & {id: string}; index: number}) {
+  const {ref, isDragging} = useSortable<TaskData>({
+    id: task.id,
+    index,
+    group: 'tasks',
+    data: {
+      title: task.title,
+      priority: task.priority,
+      completed: task.completed,
+    },
+  });
+
+  return (
+    <div ref={ref} style={{opacity: isDragging ? 0.5 : 1}}>
+      <h4>{task.title}</h4>
+      <span>{task.priority}</span>
+    </div>
+  );
+}
+```
+
+## Related
+
+- [DragDropProvider](/api/react/drag-drop-provider) — Context provider for drag and drop
+- [useDraggable](/api/react/use-draggable) — Make elements draggable
+- [useDroppable](/api/react/use-droppable) — Create drop targets

@@ -1,0 +1,357 @@
+---
+title: "DragDropManager"
+description: "Main orchestrator for drag-and-drop operations in @dnd-kit/dom"
+---
+
+## Overview
+
+The `DragDropManager` is the core class that orchestrates all drag-and-drop operations. It manages the lifecycle of drag operations, coordinates sensors and plugins, and maintains a registry of draggable and droppable elements.
+
+## Constructor
+
+```typescript
+const manager = new DragDropManager(input?);
+```
+
+### Parameters
+
+<ParamField path="input" type="Input" optional>
+  Configuration options for the manager
+
+  <Expandable title="properties">
+    <ParamField path="plugins" type="Plugins | null" optional>
+      Array of plugin classes or configured plugins. Set to `null` to disable default plugins.
+      
+      Supports using `Plugin.configure()` for per-manager configuration.
+    </ParamField>
+
+    <ParamField path="sensors" type="Sensors | null" optional>
+      Array of sensor classes or configured sensors. Set to `null` to disable default sensors.
+      
+      Supports using `Sensor.configure()` for per-manager configuration.
+    </ParamField>
+
+    <ParamField path="modifiers" type="Modifiers | null" optional>
+      Array of modifier functions to transform drag coordinates. Set to `null` to disable default modifiers.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Default Preset
+
+The manager automatically includes a default preset of sensors and plugins:
+
+```typescript
+const defaultPreset = {
+  sensors: [PointerSensor, KeyboardSensor],
+  plugins: [
+    Accessibility,
+    AutoScroller,
+    Cursor,
+    Feedback,
+    PreventSelection
+  ],
+  modifiers: []
+};
+```
+
+Additional plugins are always included:
+- `ScrollListener` - Tracks scroll events
+- `Scroller` - Manages scrolling logic
+- `StyleInjector` - Injects plugin styles
+
+## Usage
+
+### Basic Setup
+
+```typescript
+import { DragDropManager } from '@dnd-kit/dom';
+
+const manager = new DragDropManager();
+```
+
+### Custom Configuration
+
+```typescript
+import {
+  DragDropManager,
+  PointerSensor,
+  Accessibility,
+  Feedback
+} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    // Configure sensors with options
+    PointerSensor.configure({
+      activationConstraints: {
+        delay: 100,
+        tolerance: 5
+      }
+    })
+  ],
+  plugins: [
+    Accessibility,
+    // Configure feedback plugin
+    Feedback.configure({
+      dropAnimation: {
+        duration: 200,
+        easing: 'ease-out'
+      }
+    })
+  ]
+});
+```
+
+### Disable Default Preset
+
+```typescript
+// Disable all defaults
+const manager = new DragDropManager({
+  sensors: null,
+  plugins: null
+});
+
+// Or selectively override
+const manager = new DragDropManager({
+  sensors: [PointerSensor], // Only pointer, no keyboard
+  plugins: [Feedback] // Only feedback, no other plugins
+});
+```
+
+## Properties
+
+### dragOperation
+
+```typescript
+manager.dragOperation.status; // { idle: boolean, initializing: boolean, ... }
+manager.dragOperation.source; // Current draggable being dragged
+manager.dragOperation.target; // Current droppable target
+manager.dragOperation.position; // Current drag position
+manager.dragOperation.transform; // Current transform { x, y }
+```
+
+Access the current drag operation state.
+
+### registry
+
+```typescript
+manager.registry.draggables; // Collection of registered draggables
+manager.registry.droppables; // Collection of registered droppables
+manager.registry.plugins; // Collection of active plugins
+manager.registry.sensors; // Collection of active sensors
+```
+
+Access registered entities, plugins, and sensors.
+
+### monitor
+
+```typescript
+manager.monitor.addEventListener('dragstart', handler);
+manager.monitor.addEventListener('dragover', handler);
+manager.monitor.addEventListener('dragend', handler);
+```
+
+Event monitor for drag lifecycle events.
+
+### actions
+
+Internal actions used by sensors:
+
+```typescript
+// Typically used by sensor implementations
+manager.actions.start({ event, source, coordinates });
+manager.actions.move({ event, to, by });
+manager.actions.stop({ event, canceled });
+```
+
+## Events
+
+Listen to drag-and-drop events using the monitor:
+
+### dragstart
+
+```typescript
+manager.monitor.addEventListener('dragstart', (event) => {
+  console.log('Started dragging:', event.source.id);
+});
+```
+
+<ParamField path="event" type="DragStartEvent">
+  <Expandable title="properties">
+    <ParamField path="source" type="Draggable">
+      The draggable being dragged
+    </ParamField>
+    <ParamField path="coordinates" type="Coordinates">
+      Initial drag coordinates
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### dragmove
+
+```typescript
+manager.monitor.addEventListener('dragmove', (event) => {
+  console.log('Position:', event.position);
+});
+```
+
+<ParamField path="event" type="DragMoveEvent">
+  <Expandable title="properties">
+    <ParamField path="position" type="Coordinates">
+      Current drag position
+    </ParamField>
+    <ParamField path="delta" type="Coordinates">
+      Change since last move
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### dragover
+
+```typescript
+manager.monitor.addEventListener('dragover', (event) => {
+  console.log('Over:', event.target?.id);
+});
+```
+
+<ParamField path="event" type="DragOverEvent">
+  <Expandable title="properties">
+    <ParamField path="source" type="Draggable">
+      The draggable being dragged
+    </ParamField>
+    <ParamField path="target" type="Droppable | null">
+      The droppable target (or null if none)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### dragend
+
+```typescript
+manager.monitor.addEventListener('dragend', (event) => {
+  if (event.target) {
+    console.log('Dropped on:', event.target.id);
+  } else if (event.canceled) {
+    console.log('Drag canceled');
+  }
+});
+```
+
+<ParamField path="event" type="DragEndEvent">
+  <Expandable title="properties">
+    <ParamField path="source" type="Draggable">
+      The draggable that was dragged
+    </ParamField>
+    <ParamField path="target" type="Droppable | null">
+      The final drop target (or null)
+    </ParamField>
+    <ParamField path="canceled" type="boolean">
+      Whether the drag was canceled
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### collision
+
+```typescript
+manager.monitor.addEventListener('collision', (event) => {
+  console.log('Collision:', event.collision);
+});
+```
+
+Fired when collision detection runs.
+
+### beforedragstart
+
+```typescript
+manager.monitor.addEventListener('beforedragstart', (event) => {
+  // Called before drag initialization
+});
+```
+
+Fired before the drag operation is fully initialized.
+
+## Example: Complete Setup
+
+```typescript
+import {
+  DragDropManager,
+  Draggable,
+  Droppable,
+  PointerSensor,
+  KeyboardSensor,
+  Accessibility,
+  Feedback
+} from '@dnd-kit/dom';
+
+// Create manager with custom configuration
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints(event) {
+        // Custom activation logic
+        return event.pointerType === 'touch'
+          ? [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })]
+          : undefined;
+      }
+    }),
+    KeyboardSensor
+  ],
+  plugins: [
+    Accessibility.configure({
+      announcements: {
+        dragstart: (event) => `Picked up ${event.source.id}`,
+        dragend: (event) => event.target
+          ? `Dropped on ${event.target.id}`
+          : 'Drag cancelled'
+      }
+    }),
+    Feedback.configure({
+      dropAnimation: { duration: 200 }
+    })
+  ]
+});
+
+// Register draggables and droppables
+const draggable = new Draggable(
+  { id: 'item-1', element: document.getElementById('item-1') },
+  manager
+);
+
+const droppable = new Droppable(
+  { id: 'zone-1', element: document.getElementById('zone-1') },
+  manager
+);
+
+// Listen to events
+manager.monitor.addEventListener('dragend', (event) => {
+  if (event.target) {
+    console.log(`${event.source.id} dropped on ${event.target.id}`);
+  }
+});
+```
+
+## Type Definitions
+
+```typescript
+interface Input extends DragDropManagerInput<DragDropManager> {
+  plugins?: Plugins | null;
+  sensors?: Sensors | null;
+  modifiers?: Modifiers | null;
+}
+
+class DragDropManager<
+  T extends Data = Data,
+  U extends Draggable<T> = Draggable<T>,
+  V extends Droppable<T> = Droppable<T>
+> extends AbstractDragDropManager<U, V> {
+  constructor(input?: Input);
+}
+```
+
+## Related
+
+- [Sensors](/api/dom/sensors) - Configure input sensors
+- [Plugins](/api/dom/plugins) - Extend with plugins
+- [Sortable](/api/dom/sortable) - High-level sortable API

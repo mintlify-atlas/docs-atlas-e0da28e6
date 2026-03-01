@@ -1,0 +1,560 @@
+---
+title: 'Virtualized Sortable Lists'
+description: 'Handle thousands of sortable items with optimal performance using virtualization'
+---
+
+## Overview
+
+Virtualized lists render only the visible items in the viewport, enabling smooth drag-and-drop with thousands of items. This example shows how to integrate dnd-kit with popular virtualization libraries.
+
+## Why Virtualization?
+
+Rendering large lists (1000+ items) causes performance issues:
+- Slow initial render
+- Laggy scrolling
+- High memory usage
+- Poor drag-and-drop responsiveness
+
+Virtualization solves this by rendering only visible items plus a small buffer.
+
+## Using @tanstack/react-virtual
+
+### Installation
+
+```bash
+npm install @tanstack/react-virtual
+```
+
+### Basic Implementation
+
+```tsx
+import React, {forwardRef, useLayoutEffect, useRef, useState} from 'react';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+import {useWindowVirtualizer} from '@tanstack/react-virtual';
+import {Feedback} from '@dnd-kit/dom';
+
+interface SortableProps {
+  id: string | number;
+  index: number;
+}
+
+const Sortable = forwardRef<Element, SortableProps>(
+  function Sortable({id, index}, ref) {
+    const [element, setElement] = useState<Element | null>(null);
+    const handleRef = useRef<HTMLButtonElement | null>(null);
+
+    const {isDragging} = useSortable({
+      id,
+      index,
+      element,
+      plugins: [Feedback.configure({feedback: 'clone'})],
+      handle: handleRef,
+    });
+
+    return (
+      <div
+        ref={setElement}
+        data-index={index}
+        style={{
+          padding: '16px',
+          margin: '8px 0',
+          backgroundColor: isDragging ? '#f0f0f0' : 'white',
+          border: '1px solid #ddd',
+          borderRadius: '6px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span>Item {id}</span>
+        <button
+          ref={handleRef}
+          style={{
+            cursor: 'grab',
+            border: 'none',
+            background: 'transparent',
+            fontSize: '18px',
+          }}
+        >
+          ⋮⋮
+        </button>
+      </div>
+    );
+  }
+);
+
+export function VirtualizedListExample() {
+  // Create 1000 items
+  const [items, setItems] = useState(() =>
+    Array.from({length: 1000}, (_, i) => i + 1)
+  );
+  const snapshot = useRef(structuredClone(items));
+
+  const parentRef = useRef<HTMLDivElement>(null);
+  const parentOffsetRef = useRef(0);
+
+  // Configure virtualizer
+  const virtualizer = useWindowVirtualizer({
+    count: items.length,
+    estimateSize: () => 72, // Estimated row height
+    scrollMargin: parentOffsetRef.current,
+    getItemKey: (index) => items[index], // Use item ID as key
+  });
+  
+  const virtualItems = virtualizer.getVirtualItems();
+
+  useLayoutEffect(() => {
+    parentOffsetRef.current = parentRef.current?.offsetTop ?? 0;
+  }, []);
+
+  return (
+    <DragDropProvider
+      onDragStart={() => {
+        snapshot.current = structuredClone(items);
+      }}
+      onDragOver={(event) => {
+        setItems((items) => move(items, event));
+      }}
+      onDragEnd={(event) => {
+        if (event.canceled) {
+          setItems(snapshot.current);
+        }
+      }}
+    >
+      <div ref={parentRef}>
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 20,
+              alignItems: 'center',
+              gap: 20,
+              transform: `translateY(${
+                virtualItems[0]?.start - virtualizer.options.scrollMargin
+              }px)`,
+            }}
+          >
+            {virtualItems.map(({key, index}) => (
+              <Sortable
+                ref={virtualizer.measureElement}
+                key={key}
+                id={items[index]}
+                index={index}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Key Concepts
+
+### Window Virtualizer
+
+The `useWindowVirtualizer` hook virtualizes items based on the window scroll position:
+
+```tsx
+const virtualizer = useWindowVirtualizer({
+  count: items.length,           // Total number of items
+  estimateSize: () => 72,        // Estimated item height in pixels
+  scrollMargin: parentOffsetRef.current, // Offset from top of window
+  getItemKey: (index) => items[index],   // Stable key for each item
+});
+```
+
+**Important parameters:**
+- `estimateSize`: Should match your item height for accurate scrollbar sizing
+- `getItemKey`: Use the item's unique ID, not the index
+- `scrollMargin`: Accounts for fixed headers or other offsets
+
+### Measuring Elements
+
+The virtualizer needs to measure items for accurate positioning:
+
+```tsx
+const Sortable = forwardRef(function Sortable({id, index}, ref) {
+  // Component implementation
+});
+
+// Pass measureElement ref to each item
+<Sortable
+  ref={virtualizer.measureElement}
+  key={key}
+  id={items[index]}
+  index={index}
+/>
+```
+
+This allows the virtualizer to:
+- Calculate actual item sizes
+- Adjust scroll position dynamically
+- Handle variable-height items
+
+### Virtual Items Positioning
+
+The virtual items need special positioning:
+
+```tsx
+<div
+  style={{
+    height: virtualizer.getTotalSize(), // Total height of all items
+    position: 'relative',
+  }}
+>
+  <div
+    style={{
+      position: 'absolute',
+      transform: `translateY(${
+        virtualItems[0]?.start - virtualizer.options.scrollMargin
+      }px)`, // Offset to correct position
+    }}
+  >
+    {virtualItems.map(({key, index}) => (
+      <Sortable key={key} id={items[index]} index={index} />
+    ))}
+  </div>
+</div>
+```
+
+This creates:
+- A container with the full height of all items (for scrollbar)
+- An absolutely positioned inner container that translates to show visible items
+
+## Container Virtualizer
+
+For scrollable containers (not the window), use `useVirtualizer`:
+
+```tsx
+import {useVirtualizer} from '@tanstack/react-virtual';
+
+function ContainerVirtualizedList() {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState(() =>
+    Array.from({length: 1000}, (_, i) => i + 1)
+  );
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    getItemKey: (index) => items[index],
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  return (
+    <DragDropProvider
+      onDragOver={(event) => setItems((items) => move(items, event))}
+    >
+      <div
+        ref={parentRef}
+        style={{
+          height: '600px',
+          overflow: 'auto',
+        }}
+      >
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
+            }}
+          >
+            {virtualItems.map(({key, index}) => (
+              <Sortable
+                ref={virtualizer.measureElement}
+                key={key}
+                id={items[index]}
+                index={index}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+The main difference:
+- Use `useVirtualizer` instead of `useWindowVirtualizer`
+- Pass `getScrollElement` to specify the scrollable container
+- No `scrollMargin` needed
+
+## Variable Height Items
+
+For items with different heights:
+
+```tsx
+const Sortable = forwardRef(function Sortable({id, index, height}, ref) {
+  const [element, setElement] = useState<Element | null>(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={(el) => {
+        setElement(el);
+        // Also pass to virtualizer for measurement
+        if (typeof ref === 'function') ref(el);
+      }}
+      style={{
+        height: `${height}px`, // Dynamic height
+        // ... other styles
+      }}
+    >
+      Item {id}
+    </div>
+  );
+});
+
+// In parent component
+const itemHeights = useMemo(
+  () => items.map(() => Math.floor(Math.random() * 100) + 50),
+  [items.length]
+);
+
+const virtualizer = useWindowVirtualizer({
+  count: items.length,
+  estimateSize: (index) => itemHeights[index], // Use actual heights
+  getItemKey: (index) => items[index],
+});
+
+{virtualItems.map(({key, index}) => (
+  <Sortable
+    ref={virtualizer.measureElement}
+    key={key}
+    id={items[index]}
+    index={index}
+    height={itemHeights[index]}
+  />
+))}
+```
+
+## Feedback Plugin
+
+For virtualized lists, always use the clone feedback mode:
+
+```tsx
+import {Feedback} from '@dnd-kit/dom';
+
+useSortable({
+  id,
+  index,
+  plugins: [Feedback.configure({feedback: 'clone'})],
+});
+```
+
+This ensures:
+- The drag preview is visible even when the original item scrolls out of view
+- Smooth dragging across the entire list
+- Proper visual feedback
+
+## Performance Tips
+
+### 1. Optimize Re-renders
+
+```tsx
+const Sortable = memo(forwardRef(function Sortable({id, index}, ref) {
+  // Component implementation
+}));
+```
+
+### 2. Use Stable Keys
+
+```tsx
+// ✅ Good: Use item ID
+getItemKey: (index) => items[index]
+
+// ❌ Bad: Use index
+getItemKey: (index) => index
+```
+
+### 3. Debounce State Updates
+
+For extremely large lists (10,000+ items), debounce updates:
+
+```tsx
+import {useDebouncedCallback} from 'use-debounce';
+
+const debouncedMove = useDebouncedCallback(
+  (event) => setItems((items) => move(items, event)),
+  16 // ~60fps
+);
+
+<DragDropProvider
+  onDragOver={debouncedMove}
+  onDragEnd={(event) => {
+    if (!event.canceled) {
+      setItems((items) => move(items, event));
+    }
+  }}
+>
+```
+
+### 4. Overscan Configuration
+
+Adjust the number of items rendered outside the viewport:
+
+```tsx
+const virtualizer = useWindowVirtualizer({
+  count: items.length,
+  estimateSize: () => 72,
+  overscan: 5, // Render 5 extra items above/below viewport
+});
+```
+
+Higher overscan:
+- Smoother scrolling
+- Higher memory usage
+
+Lower overscan:
+- Lower memory usage
+- Possible visual glitches during fast scrolling
+
+## Horizontal Virtualization
+
+For horizontal lists:
+
+```tsx
+const virtualizer = useWindowVirtualizer({
+  horizontal: true,
+  count: items.length,
+  estimateSize: () => 150, // Item width
+});
+
+return (
+  <div
+    style={{
+      width: virtualizer.getTotalSize(),
+      display: 'flex',
+      flexDirection: 'row',
+    }}
+  >
+    <div
+      style={{
+        display: 'flex',
+        transform: `translateX(${virtualItems[0]?.start ?? 0}px)`,
+      }}
+    >
+      {virtualItems.map(({key, index}) => (
+        <Sortable key={key} id={items[index]} index={index} />
+      ))}
+    </div>
+  </div>
+);
+```
+
+## Virtualized Grid
+
+For 2D grids with virtualization:
+
+```tsx
+import {useVirtualizer} from '@tanstack/react-virtual';
+
+function VirtualizedGrid() {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState(() =>
+    Array.from({length: 10000}, (_, i) => i + 1)
+  );
+
+  const COLUMNS = 5;
+  const rowCount = Math.ceil(items.length / COLUMNS);
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 150,
+  });
+
+  return (
+    <DragDropProvider onDragOver={(event) => setItems(move(items, event))}>
+      <div ref={parentRef} style={{height: '600px', overflow: 'auto'}}>
+        <div style={{height: virtualizer.getTotalSize()}}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const startIndex = virtualRow.index * COLUMNS;
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: virtualRow.start,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`,
+                  gap: 16,
+                }}
+              >
+                {items.slice(startIndex, startIndex + COLUMNS).map((id, i) => (
+                  <Sortable
+                    key={id}
+                    id={id}
+                    index={startIndex + i}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Common Issues
+
+### Items Jump During Drag
+
+**Problem:** Items jump to incorrect positions while dragging.
+
+**Solution:** Ensure `getItemKey` uses stable IDs:
+
+```tsx
+getItemKey: (index) => items[index] // ✅ Correct
+getItemKey: (index) => index        // ❌ Causes jumps
+```
+
+### Scrollbar Size Incorrect
+
+**Problem:** Scrollbar shows wrong total size.
+
+**Solution:** Provide accurate `estimateSize`:
+
+```tsx
+estimateSize: () => 72 // Match actual item height
+```
+
+### Poor Performance
+
+**Problem:** Still laggy with virtualization.
+
+**Solutions:**
+1. Memoize components with `React.memo`
+2. Reduce overscan value
+3. Use `feedback: 'clone'` plugin
+4. Avoid heavy computations in render
+
+## Next Steps
+
+- Learn about [collision detection strategies](/api/collision/algorithms) for fine-tuning drop zones
+- Explore [plugins](/api/plugins) for customizing drag behavior
+- Read about [sensors](/api/sensors) for handling different input methods

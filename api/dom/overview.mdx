@@ -1,0 +1,216 @@
+---
+title: "@dnd-kit/dom"
+description: "DOM implementation of dnd-kit with sensors, plugins, and drag-and-drop primitives"
+---
+
+## Overview
+
+The `@dnd-kit/dom` package provides a complete DOM-based implementation of the dnd-kit drag-and-drop framework. It includes built-in sensors for pointer and keyboard interactions, plugins for accessibility and visual feedback, and high-level primitives for common use cases.
+
+## Installation
+
+```bash
+npm install @dnd-kit/dom
+```
+
+## Core Exports
+
+### DragDropManager
+
+The main orchestrator for drag-and-drop operations.
+
+```typescript
+import { DragDropManager } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  plugins: [...],
+  sensors: [...],
+  modifiers: [...]
+});
+```
+
+See [DragDropManager](/api/dom/drag-drop-manager) for detailed documentation.
+
+### Entities
+
+- `Draggable` - Makes elements draggable
+- `Droppable` - Makes elements drop targets
+- `Sortable` - Combines draggable and droppable for sortable lists
+
+### Sensors
+
+- [PointerSensor](/api/dom/sensors#pointersensor) - Handles mouse, touch, and pen input
+- [KeyboardSensor](/api/dom/sensors#keyboardsensor) - Handles keyboard-based dragging
+
+See [Sensors](/api/dom/sensors) for detailed documentation.
+
+### Plugins
+
+- [Accessibility](/api/dom/plugins#accessibility) - Screen reader announcements and ARIA attributes
+- [AutoScroller](/api/dom/plugins#autoscroller) - Auto-scroll when dragging near edges
+- [Feedback](/api/dom/plugins#feedback) - Visual feedback during drag operations
+- [Cursor](/api/dom/plugins#cursor) - Cursor styling during drag
+- [PreventSelection](/api/dom/plugins#preventselection) - Prevents text selection
+
+See [Plugins](/api/dom/plugins) for detailed documentation.
+
+## Default Preset
+
+The `DragDropManager` includes a default preset with recommended sensors and plugins:
+
+```typescript
+const defaultPreset = {
+  sensors: [
+    PointerSensor,
+    KeyboardSensor
+  ],
+  plugins: [
+    Accessibility,
+    AutoScroller,
+    Cursor,
+    Feedback,
+    PreventSelection
+  ],
+  modifiers: []
+};
+```
+
+This preset is automatically applied unless you override it:
+
+```typescript
+// Uses default preset
+const manager = new DragDropManager();
+
+// Override sensors only
+const manager = new DragDropManager({
+  sensors: [PointerSensor] // Keyboard disabled
+});
+
+// Disable default preset entirely
+const manager = new DragDropManager({
+  sensors: null,
+  plugins: null
+});
+```
+
+## Events
+
+The manager emits events throughout the drag lifecycle:
+
+```typescript
+manager.monitor.addEventListener('dragstart', (event) => {
+  console.log('Drag started:', event.source);
+});
+
+manager.monitor.addEventListener('dragover', (event) => {
+  console.log('Dragging over:', event.target);
+});
+
+manager.monitor.addEventListener('dragend', (event) => {
+  console.log('Drag ended:', event.target);
+});
+```
+
+### Event Types
+
+- `beforedragstart` - Before drag initialization
+- `dragstart` - Drag operation started
+- `dragmove` - Draggable position changed
+- `dragover` - Dragging over a droppable
+- `collision` - Collision detected with droppable
+- `dragend` - Drag operation ended
+
+## Basic Example
+
+```typescript
+import { DragDropManager, Draggable, Droppable } from '@dnd-kit/dom';
+
+const manager = new DragDropManager();
+
+const draggable = new Draggable(
+  {
+    id: 'draggable-1',
+    element: document.getElementById('draggable')
+  },
+  manager
+);
+
+const droppable = new Droppable(
+  {
+    id: 'droppable-1',
+    element: document.getElementById('droppable')
+  },
+  manager
+);
+
+manager.monitor.addEventListener('dragend', (event) => {
+  if (event.target) {
+    console.log('Dropped on:', event.target.id);
+  }
+});
+```
+
+## Package Exports
+
+```typescript
+// Main export
+export {
+  DragDropManager,
+  defaultPreset,
+  resolveCustomizable
+};
+
+// Entities
+export { Draggable, Droppable };
+
+// Sensors
+export { PointerSensor, KeyboardSensor, PointerActivationConstraints };
+
+// Plugins
+export {
+  Accessibility,
+  AutoScroller,
+  Cursor,
+  Feedback,
+  PreventSelection,
+  Scroller,
+  ScrollListener,
+  StyleInjector
+};
+
+// Events
+export type {
+  CollisionEvent,
+  BeforeDragStartEvent,
+  DragStartEvent,
+  DragMoveEvent,
+  DragOverEvent,
+  DragEndEvent
+};
+```
+
+## Additional Exports
+
+The package also provides additional exports for specific use cases:
+
+- `/sortable` - Sortable list primitives
+- `/modifiers` - Position and constraint modifiers
+- `/utilities` - DOM utilities and helpers
+- `/plugins/debug` - Debug visualization plugin
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DragDropManager" icon="gear" href="/api/dom/drag-drop-manager">
+    Configure the drag-and-drop manager
+  </Card>
+  <Card title="Sensors" icon="hand-pointer" href="/api/dom/sensors">
+    Configure pointer and keyboard sensors
+  </Card>
+  <Card title="Plugins" icon="puzzle-piece" href="/api/dom/plugins">
+    Extend functionality with plugins
+  </Card>
+  <Card title="Sortable" icon="list" href="/api/dom/sortable">
+    Build sortable lists
+  </Card>
+</CardGroup>

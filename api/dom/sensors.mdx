@@ -1,0 +1,443 @@
+---
+title: "Sensors"
+description: "Input sensors for pointer and keyboard interactions"
+---
+
+## Overview
+
+Sensors detect and handle input events to initiate and control drag operations. The `@dnd-kit/dom` package includes two built-in sensors:
+
+- **PointerSensor** - Handles mouse, touch, and pen interactions
+- **KeyboardSensor** - Handles keyboard-based dragging
+
+Both sensors are included in the default preset.
+
+## PointerSensor
+
+Handles pointer events including mouse, touch, and pen input.
+
+### Options
+
+```typescript
+import { PointerSensor } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints: ...,
+      activatorElements: ...,
+      preventActivation: ...
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="PointerSensorOptions">
+  <Expandable title="properties">
+    <ParamField path="activationConstraints" type="ActivationConstraints | Function" optional>
+      Constraints that must be satisfied before a drag starts.
+      
+      Can be a static constraint array or a function that returns constraints based on the event and source:
+      
+      ```typescript
+      activationConstraints(event, source) {
+        if (event.pointerType === 'touch') {
+          return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
+        }
+        return undefined; // No constraints for mouse
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="activatorElements" type="Element[] | Function" optional>
+      Elements that can initiate a drag.
+      
+      By default, uses the draggable's `handle` or `element`. Can be an array of elements or a function:
+      
+      ```typescript
+      activatorElements(source) {
+        return [source.element.querySelector('.drag-handle')];
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="preventActivation" type="(event, source) => boolean" optional>
+      Function to prevent drag activation based on the event.
+      
+      Return `true` to prevent activation:
+      
+      ```typescript
+      preventActivation(event, source) {
+        return event.target.tagName === 'BUTTON';
+      }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Default Behavior
+
+The PointerSensor has intelligent defaults:
+
+```typescript
+PointerSensor.defaults = {
+  activationConstraints(event, source) {
+    const { pointerType, target } = event;
+
+    // Mouse on handle: activate immediately
+    if (pointerType === 'mouse' && (source.handle === target || source.handle?.contains(target))) {
+      return undefined;
+    }
+
+    // Touch: 250ms delay with 5px tolerance
+    if (pointerType === 'touch') {
+      return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
+    }
+
+    // Text input: 200ms delay with no movement
+    if (isTextInput(target)) {
+      return [new PointerActivationConstraints.Delay({ value: 200, tolerance: 0 })];
+    }
+
+    // Default: 200ms delay or 5px distance
+    return [
+      new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+      new PointerActivationConstraints.Distance({ value: 5 })
+    ];
+  },
+  
+  preventActivation(event, source) {
+    const { target } = event;
+    if (target === source.element || target === source.handle) return false;
+    if (source.handle?.contains(target)) return false;
+    return isInteractiveElement(target); // Button, link, input, etc.
+  }
+};
+```
+
+## Activation Constraints
+
+Activation constraints control when a drag operation starts.
+
+### PointerActivationConstraints.Delay
+
+Requires the pointer to be held down for a duration before activating.
+
+```typescript
+import { PointerActivationConstraints } from '@dnd-kit/dom';
+
+new PointerActivationConstraints.Delay({
+  value: 250,    // Milliseconds to wait
+  tolerance: 5   // Max pixels of movement allowed
+});
+```
+
+<ParamField path="options" type="DelayConstraintOptions">
+  <Expandable title="properties">
+    <ParamField path="value" type="number" required>
+      Duration in milliseconds to wait before activation
+    </ParamField>
+    <ParamField path="tolerance" type="number" required>
+      Maximum distance in pixels the pointer can move during the delay.
+      
+      If the pointer moves more than this distance, the constraint fails and drag is canceled.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### PointerActivationConstraints.Distance
+
+Requires the pointer to move a minimum distance before activating.
+
+```typescript
+import { PointerActivationConstraints } from '@dnd-kit/dom';
+
+new PointerActivationConstraints.Distance({
+  value: 5,      // Pixels to move
+  tolerance: 10  // Max pixels before failing (optional)
+});
+```
+
+<ParamField path="options" type="DistanceConstraintOptions">
+  <Expandable title="properties">
+    <ParamField path="value" type="number" required>
+      Minimum distance in pixels the pointer must move to activate
+    </ParamField>
+    <ParamField path="tolerance" type="number" optional>
+      Maximum distance in pixels before the constraint fails.
+      
+      Useful to cancel if the user moves too far (e.g., scrolling vs dragging).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Combining Constraints
+
+Multiple constraints can be combined. The drag activates when **any** constraint is satisfied:
+
+```typescript
+PointerSensor.configure({
+  activationConstraints: [
+    // Activate after 200ms OR after moving 8px
+    new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+    new PointerActivationConstraints.Distance({ value: 8 })
+  ]
+});
+```
+
+## KeyboardSensor
+
+Handles keyboard-based dragging with arrow keys.
+
+### Options
+
+```typescript
+import { KeyboardSensor } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    KeyboardSensor.configure({
+      offset: 10,
+      keyboardCodes: {
+        start: ['Space', 'Enter'],
+        cancel: ['Escape'],
+        end: ['Space', 'Enter', 'Tab'],
+        up: ['ArrowUp'],
+        down: ['ArrowDown'],
+        left: ['ArrowLeft'],
+        right: ['ArrowRight']
+      },
+      preventActivation: (event, source) => {
+        return event.target !== source.handle;
+      }
+    })
+  ]
+});
+```
+
+<ParamField path="options" type="KeyboardSensorOptions">
+  <Expandable title="properties">
+    <ParamField path="offset" type="number | { x: number, y: number }" optional default="10">
+      Distance in pixels to move per arrow key press.
+      
+      Can be a single number (applied to both axes) or an object with separate x/y offsets:
+      
+      ```typescript
+      offset: { x: 15, y: 10 }
+      ```
+    </ParamField>
+
+    <ParamField path="keyboardCodes" type="KeyboardCodes" optional>
+      Keyboard codes for different actions.
+      
+      ```typescript
+      {
+        start: ['Space', 'Enter'],      // Start dragging
+        cancel: ['Escape'],              // Cancel drag
+        end: ['Space', 'Enter', 'Tab'], // End drag
+        up: ['ArrowUp'],                 // Move up
+        down: ['ArrowDown'],             // Move down
+        left: ['ArrowLeft'],             // Move left
+        right: ['ArrowRight']            // Move right
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="preventActivation" type="(event, source) => boolean" optional>
+      Function to prevent drag activation.
+      
+      Default prevents activation if the target is not the handle or element:
+      
+      ```typescript
+      preventActivation(event, source) {
+        const target = source.handle ?? source.element;
+        return event.target !== target;
+      }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Default Behavior
+
+```typescript
+KeyboardSensor.defaults = {
+  offset: 10,
+  keyboardCodes: {
+    start: ['Space', 'Enter'],
+    cancel: ['Escape'],
+    end: ['Space', 'Enter', 'Tab'],
+    up: ['ArrowUp'],
+    down: ['ArrowDown'],
+    left: ['ArrowLeft'],
+    right: ['ArrowRight']
+  },
+  preventActivation(event, source) {
+    const target = source.handle ?? source.element;
+    return event.target !== target;
+  }
+};
+```
+
+### Keyboard Movement
+
+The KeyboardSensor supports accelerated movement:
+
+- **Normal**: Press arrow key to move by `offset` pixels
+- **Fast**: Hold `Shift` + arrow key to move by `offset * 5` pixels
+
+```typescript
+// Move 10px per keypress, or 50px with Shift
+KeyboardSensor.configure({ offset: 10 });
+
+// Different speeds per axis
+KeyboardSensor.configure({
+  offset: { x: 15, y: 10 } // 75px horizontal, 50px vertical with Shift
+});
+```
+
+## Example: Custom Sensor Configuration
+
+```typescript
+import {
+  DragDropManager,
+  PointerSensor,
+  KeyboardSensor,
+  PointerActivationConstraints
+} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    // Pointer with custom constraints
+    PointerSensor.configure({
+      activationConstraints(event, source) {
+        // Touch: longer delay on mobile
+        if (event.pointerType === 'touch') {
+          return [
+            new PointerActivationConstraints.Delay({
+              value: 300,
+              tolerance: 8
+            })
+          ];
+        }
+        
+        // Mouse: require 5px movement
+        return [
+          new PointerActivationConstraints.Distance({ value: 5 })
+        ];
+      },
+      
+      // Only drag from elements with .drag-handle class
+      activatorElements(source) {
+        const handle = source.element.querySelector('.drag-handle');
+        return handle ? [handle] : [];
+      },
+      
+      // Don't drag from buttons or links
+      preventActivation(event, source) {
+        const target = event.target as Element;
+        return target.tagName === 'BUTTON' || target.tagName === 'A';
+      }
+    }),
+    
+    // Keyboard with larger movement
+    KeyboardSensor.configure({
+      offset: 20, // Move 20px at a time (100px with Shift)
+      keyboardCodes: {
+        start: ['Space'],        // Only Space to start
+        cancel: ['Escape'],
+        end: ['Enter'],          // Only Enter to drop
+        up: ['ArrowUp', 'w'],   // Support WASD
+        down: ['ArrowDown', 's'],
+        left: ['ArrowLeft', 'a'],
+        right: ['ArrowRight', 'd']
+      }
+    })
+  ]
+});
+```
+
+## Example: Touch-Optimized
+
+```typescript
+import {
+  DragDropManager,
+  PointerSensor,
+  PointerActivationConstraints
+} from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      activationConstraints: [
+        // Short delay for all pointer types
+        new PointerActivationConstraints.Delay({
+          value: 150,
+          tolerance: 5
+        })
+      ]
+    })
+  ]
+});
+```
+
+## Example: Mouse Only, Immediate Activation
+
+```typescript
+import { DragDropManager, PointerSensor } from '@dnd-kit/dom';
+
+const manager = new DragDropManager({
+  sensors: [
+    PointerSensor.configure({
+      // No constraints = immediate activation
+      activationConstraints: undefined,
+      
+      // Only allow mouse
+      preventActivation(event, source) {
+        return event.pointerType !== 'mouse';
+      }
+    })
+  ]
+});
+```
+
+## Type Definitions
+
+```typescript
+interface PointerSensorOptions {
+  activationConstraints?:
+    | ActivationConstraints<PointerEvent>
+    | ((event: PointerEvent, source: Draggable) => 
+        ActivationConstraints<PointerEvent> | undefined);
+  activatorElements?: 
+    | Element[]
+    | ((source: Draggable) => Element[]);
+  preventActivation?: (event: PointerEvent, source: Draggable) => boolean;
+}
+
+interface KeyboardSensorOptions {
+  offset?: number | { x: number; y: number };
+  keyboardCodes?: KeyboardCodes;
+  preventActivation?: (event: KeyboardEvent, source: Draggable) => boolean;
+}
+
+interface KeyboardCodes {
+  start: KeyCode[];
+  cancel: KeyCode[];
+  end: KeyCode[];
+  up: KeyCode[];
+  down: KeyCode[];
+  left: KeyCode[];
+  right: KeyCode[];
+}
+
+class PointerActivationConstraints {
+  static Delay: typeof DelayConstraint;
+  static Distance: typeof DistanceConstraint;
+}
+```
+
+## Related
+
+- [DragDropManager](/api/dom/drag-drop-manager) - Configure the manager
+- [Plugins](/api/dom/plugins) - Extend functionality

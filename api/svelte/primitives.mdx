@@ -1,0 +1,422 @@
+---
+title: Svelte Primitives
+description: Complete API reference for dnd-kit Svelte primitives
+---
+
+## createDraggable
+
+Make an element draggable.
+
+### Usage
+
+```svelte
+<script>
+import { createDraggable } from '@dnd-kit/svelte';
+
+const draggable = createDraggable({
+  id: 'draggable-1',
+  data: { type: 'card' }
+});
+</script>
+
+<div 
+  use:draggable.attach 
+  class:dragging={draggable.isDragging}
+>
+  Drag me
+</div>
+```
+
+### Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for the draggable element. Can be a getter for reactivity.
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to the draggable instance. Use a getter for reactive data.
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Whether the draggable is disabled. Use a getter for reactivity.
+</ParamField>
+
+<ParamField path="alignment" type="Alignment">
+  Alignment configuration for the draggable element
+</ParamField>
+
+<ParamField path="plugins" type="Plugin[]">
+  Array of plugins to apply to this draggable
+</ParamField>
+
+<ParamField path="modifiers" type="Modifier[]">
+  Array of modifiers to transform drag coordinates
+</ParamField>
+
+<ParamField path="sensors" type="Sensor[]">
+  Custom sensors for this draggable instance
+</ParamField>
+
+### Returns
+
+<ResponseField name="draggable" type="Draggable">
+  The draggable instance
+</ResponseField>
+
+<ResponseField name="isDragging" type="boolean">
+  Whether this element is currently being dragged (reactive getter)
+</ResponseField>
+
+<ResponseField name="isDropping" type="boolean">
+  Whether this element is currently dropping (reactive getter)
+</ResponseField>
+
+<ResponseField name="isDragSource" type="boolean">
+  Whether this element is the source of the current drag operation (reactive getter)
+</ResponseField>
+
+<ResponseField name="attach" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach the draggable behavior to an element
+</ResponseField>
+
+<ResponseField name="attachHandle" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach a drag handle to an element
+</ResponseField>
+
+### Example with Handle
+
+```svelte
+<script>
+import { createDraggable } from '@dnd-kit/svelte';
+
+const draggable = createDraggable({
+  id: 'card-1',
+  data: { title: 'My Card' }
+});
+</script>
+
+<div use:draggable.attach class:dragging={draggable.isDragging}>
+  <div use:draggable.attachHandle class="handle">
+    ⋮⋮
+  </div>
+  <div class="content">
+    Card content
+  </div>
+</div>
+```
+
+---
+
+## createDroppable
+
+Make an element droppable.
+
+### Usage
+
+```svelte
+<script>
+import { createDroppable } from '@dnd-kit/svelte';
+
+const droppable = createDroppable({
+  id: 'droppable-1',
+  accept: ['card']
+});
+</script>
+
+<div 
+  use:droppable.attach 
+  class:drop-target={droppable.isDropTarget}
+>
+  Drop here
+</div>
+```
+
+### Parameters
+
+<ParamField path="id" type="string | number" required>
+  Unique identifier for the droppable element. Can be a getter for reactivity.
+</ParamField>
+
+<ParamField path="accept" type="string[]">
+  Array of draggable types this droppable accepts. Use a getter for reactivity.
+</ParamField>
+
+<ParamField path="type" type="string">
+  Type identifier for this droppable
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Whether the droppable is disabled. Use a getter for reactivity.
+</ParamField>
+
+<ParamField path="data" type="T">
+  Custom data to attach to the droppable instance
+</ParamField>
+
+<ParamField path="collisionDetector" type="CollisionDetector">
+  Custom collision detection algorithm
+</ParamField>
+
+### Returns
+
+<ResponseField name="droppable" type="Droppable">
+  The droppable instance
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="boolean">
+  Whether this element is currently a valid drop target (reactive getter)
+</ResponseField>
+
+<ResponseField name="attach" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach the droppable behavior to an element
+</ResponseField>
+
+---
+
+## createSortable
+
+Combine draggable and droppable functionality for sortable items.
+
+### Usage
+
+```svelte
+<script>
+import { createSortable } from '@dnd-kit/svelte/sortable';
+
+let items = $state([
+  { id: 1, text: 'Item 1' },
+  { id: 2, text: 'Item 2' },
+  { id: 3, text: 'Item 3' }
+]);
+</script>
+
+{#each items as item, index (item.id)}
+  {@const sortable = createSortable({
+    id: item.id,
+    group: 'list',
+    get index() { return index; }
+  })}
+  
+  <div 
+    use:sortable.attach
+    class:dragging={sortable.isDragging}
+    class:drop-target={sortable.isDropTarget}
+  >
+    {item.text}
+  </div>
+{/each}
+```
+
+### Parameters
+
+Includes all parameters from `createDraggable` and `createDroppable`, plus:
+
+<ParamField path="group" type="string | number" required>
+  The sortable group this item belongs to. Use a getter for reactivity.
+</ParamField>
+
+<ParamField path="index" type="number" required>
+  The current index of this item in the sortable group. Use a getter for reactivity.
+</ParamField>
+
+<ParamField path="transition" type="Transition">
+  Transition configuration for sortable animations
+</ParamField>
+
+<ParamField path="collisionPriority" type="number">
+  Priority for collision detection when multiple droppables overlap
+</ParamField>
+
+### Returns
+
+<ResponseField name="sortable" type="Sortable">
+  The sortable instance
+</ResponseField>
+
+<ResponseField name="isDragging" type="boolean">
+  Whether this element is currently being dragged (reactive getter)
+</ResponseField>
+
+<ResponseField name="isDropping" type="boolean">
+  Whether this element is currently dropping (reactive getter)
+</ResponseField>
+
+<ResponseField name="isDragSource" type="boolean">
+  Whether this element is the source of the current drag operation (reactive getter)
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="boolean">
+  Whether this element is currently a valid drop target (reactive getter)
+</ResponseField>
+
+<ResponseField name="attach" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach the sortable behavior to an element
+</ResponseField>
+
+<ResponseField name="attachHandle" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach a drag handle
+</ResponseField>
+
+<ResponseField name="attachSource" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach a source element
+</ResponseField>
+
+<ResponseField name="attachTarget" type="(node: HTMLElement) => { destroy: () => void }">
+  Svelte action to attach a target element for drop positioning
+</ResponseField>
+
+---
+
+## createDragDropMonitor
+
+Listen to drag and drop events.
+
+### Usage
+
+```svelte
+<script>
+import { createDragDropMonitor } from '@dnd-kit/svelte';
+
+createeDragDropMonitor({
+  onDragStart(event) {
+    console.log('Drag started:', event.operation.source);
+  },
+  onDragMove(event) {
+    console.log('Dragging:', event.operation.shape.current);
+  },
+  onDragEnd(event) {
+    console.log('Drag ended:', event.operation);
+  },
+  onBeforeDragStart(event) {
+    if (shouldCancel) {
+      event.preventDefault();
+    }
+  }
+});
+</script>
+```
+
+### Parameters
+
+<ParamField path="onBeforeDragStart" type="(event: BeforeDragStartEvent) => void">
+  Called before drag starts. Can cancel the operation.
+</ParamField>
+
+<ParamField path="onDragStart" type="(event: DragStartEvent) => void">
+  Called when drag operation starts
+</ParamField>
+
+<ParamField path="onDragMove" type="(event: DragMoveEvent) => void">
+  Called when the dragged element moves
+</ParamField>
+
+<ParamField path="onDragOver" type="(event: DragOverEvent) => void">
+  Called when dragging over a droppable
+</ParamField>
+
+<ParamField path="onDragEnd" type="(event: DragEndEvent) => void">
+  Called when drag operation ends
+</ParamField>
+
+<ParamField path="onDragCancel" type="(event: DragCancelEvent) => void">
+  Called when drag operation is cancelled
+</ParamField>
+
+---
+
+## createDragOperation
+
+Access the current drag operation state.
+
+### Usage
+
+```svelte
+<script>
+import { createDragOperation } from '@dnd-kit/svelte';
+
+const dragOperation = createDragOperation();
+</script>
+
+{#if dragOperation.source}
+  <div>Currently dragging: {dragOperation.source.id}</div>
+{/if}
+
+{#if dragOperation.target}
+  <div>Over: {dragOperation.target.id}</div>
+{/if}
+
+<div>
+  Status: {dragOperation.status.idle ? 'idle' : 'active'}
+</div>
+```
+
+### Returns
+
+<ResponseField name="source" type="Draggable | null">
+  The source draggable element of the current operation (reactive getter)
+</ResponseField>
+
+<ResponseField name="target" type="Droppable | null">
+  The current drop target (reactive getter)
+</ResponseField>
+
+<ResponseField name="status" type="DragOperationStatus">
+  The status of the drag operation (reactive getter)
+</ResponseField>
+
+---
+
+## getDragDropManager
+
+Access the drag drop manager instance.
+
+### Usage
+
+```svelte
+<script>
+import { getDragDropManager } from '@dnd-kit/svelte';
+
+const manager = getDragDropManager();
+
+// Access manager properties
+const draggables = manager.registry.draggables;
+const droppables = manager.registry.droppables;
+</script>
+```
+
+### Returns
+
+<ResponseField name="manager" type="DragDropManager">
+  The drag drop manager instance
+</ResponseField>
+
+---
+
+## createDeepSignal
+
+Create a deep reactive proxy for signal-based objects.
+
+### Usage
+
+```svelte
+<script>
+import { createDeepSignal } from '@dnd-kit/svelte/utilities';
+
+const tracked = createDeepSignal(() => manager.dragOperation);
+
+// Accessing nested signal properties triggers reactivity
+const sourceId = tracked.current.source?.id;
+</script>
+```
+
+### Parameters
+
+<ParamField path="getTarget" type="() => T" required>
+  A function that returns the target object to track (typically contains signals)
+</ParamField>
+
+### Returns
+
+<ResponseField name="current" type="T">
+  A reactive getter that proxies access to the target and triggers reactivity on nested signal reads
+</ResponseField>

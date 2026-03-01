@@ -1,0 +1,333 @@
+---
+title: Accessibility Features
+description: Build inclusive drag and drop interfaces with keyboard support, screen readers, and ARIA attributes
+---
+
+The dnd-kit accessibility plugin provides comprehensive keyboard navigation and screen reader support out of the box.
+
+## Accessibility Plugin
+
+The `Accessibility` plugin automatically adds ARIA attributes and screen reader announcements to your drag and drop interface:
+
+```tsx
+import {DragDropProvider} from '@dnd-kit/react';
+import {Accessibility} from '@dnd-kit/dom/plugins/accessibility';
+
+function App() {
+  return (
+    <DragDropProvider
+      plugins={[
+        Accessibility,  // Adds automatic accessibility features
+      ]}
+    >
+      {/* Your draggable content */}
+    </DragDropProvider>
+  );
+}
+```
+
+<Tip>
+The Accessibility plugin is included by default in most dnd-kit setups. You typically don't need to add it manually unless you're customizing plugins.
+</Tip>
+
+## What the Plugin Provides
+
+The Accessibility plugin automatically adds:
+
+### ARIA Attributes
+
+- **`role="button"`** - Identifies draggable elements as interactive
+- **`aria-roledescription="draggable"`** - Describes the element's drag capability
+- **`tabindex="0"`** - Makes elements keyboard-focusable
+- **`aria-pressed`** - Indicates drag state (true when dragging)
+- **`aria-grabbed`** - Alternative drag state indicator
+- **`aria-disabled`** - Indicates when dragging is disabled
+- **`aria-describedby`** - Links to screen reader instructions
+
+### Screen Reader Instructions
+
+Default instructions are automatically provided:
+
+> "To pick up a draggable item, press the space bar. While dragging, use the arrow keys to move the item in a given direction. Press space again to drop the item in its new position, or press escape to cancel."
+
+### Live Region Announcements
+
+Screen readers announce drag and drop events in real-time:
+
+- **Drag start**: "Picked up draggable item {id}."
+- **Drag over**: "Draggable item {id} was moved over droppable target {targetId}."
+- **Drag end**: "Draggable item {id} was dropped over droppable target {targetId}."
+- **Cancel**: "Dragging was cancelled. Draggable item {id} was dropped."
+
+## Keyboard Navigation
+
+The keyboard sensor enables full keyboard control:
+
+### Default Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| **Space** or **Enter** | Pick up / Drop item |
+| **Arrow Keys** | Move dragged item |
+| **Shift + Arrow Keys** | Move faster (5x speed) |
+| **Escape** | Cancel drag operation |
+| **Tab** | Drop item and move focus |
+
+### Keyboard Sensor Configuration
+
+Customize keyboard behavior with the `KeyboardSensor`:
+
+```tsx
+import {KeyboardSensor} from '@dnd-kit/dom/sensors/keyboard';
+
+const customKeyboardSensor = KeyboardSensor.configure({
+  // Distance to move per arrow key press
+  offset: 10,  // or {x: 10, y: 15}
+  
+  // Customize key codes
+  keyboardCodes: {
+    start: ['Space', 'Enter'],
+    cancel: ['Escape'],
+    end: ['Space', 'Enter', 'Tab'],
+    up: ['ArrowUp', 'KeyW'],
+    down: ['ArrowDown', 'KeyS'],
+    left: ['ArrowLeft', 'KeyA'],
+    right: ['ArrowRight', 'KeyD'],
+  },
+});
+
+<DragDropProvider sensors={[customKeyboardSensor]}>
+  {/* Your content */}
+</DragDropProvider>
+```
+
+<Warning>
+When customizing keyboard codes, ensure you maintain standard arrow key navigation for accessibility compliance.
+</Warning>
+
+## Custom Announcements
+
+Customize screen reader announcements to match your interface:
+
+```tsx
+import {Accessibility} from '@dnd-kit/dom/plugins/accessibility';
+
+const customAccessibility = new Accessibility(manager, {
+  announcements: {
+    dragstart({operation: {source}}) {
+      if (!source) return;
+      return `Started dragging ${source.data?.title || source.id}`;
+    },
+    
+    dragover({operation: {source, target}}) {
+      if (!source || source.id === target?.id) return;
+      
+      if (target) {
+        return `${source.data?.title} is now over ${target.data?.title}`;
+      }
+      
+      return `${source.data?.title} is no longer over a drop zone`;
+    },
+    
+    dragend({operation: {source, target}, canceled}) {
+      if (!source) return;
+      
+      if (canceled) {
+        return `Cancelled. ${source.data?.title} was not moved.`;
+      }
+      
+      if (target) {
+        return `${source.data?.title} was dropped on ${target.data?.title}`;
+      }
+      
+      return `${source.data?.title} was dropped`;
+    },
+  },
+  
+  // Debounce announcements during drag (default: 500ms)
+  debounce: 300,
+});
+```
+
+## Custom Screen Reader Instructions
+
+Provide context-specific instructions:
+
+```tsx
+const customAccessibility = new Accessibility(manager, {
+  screenReaderInstructions: {
+    draggable: `To reorder items in the list, press space to pick up an item. 
+                Use arrow keys to move it up or down. 
+                Press space again to place the item, or escape to cancel.`,
+  },
+});
+```
+
+## Focus Management
+
+Ensure proper focus management during drag operations:
+
+```tsx
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging, sortable} = useSortable({id, index, element});
+  
+  // Return focus to element after drop
+  useEffect(() => {
+    if (!isDragging && element) {
+      const wasJustDropped = /* track previous state */;
+      if (wasJustDropped) {
+        element.focus();
+      }
+    }
+  }, [isDragging, element]);
+  
+  return <div ref={setElement} tabIndex={0}>{id}</div>;
+}
+```
+
+## Preventing Keyboard Activation
+
+Prevent keyboard sensor activation in specific scenarios:
+
+```tsx
+const keyboardSensor = KeyboardSensor.configure({
+  preventActivation: (event, source) => {
+    // Don't activate if user is typing in an input
+    const target = event.target;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return true;
+    }
+    
+    // Default behavior
+    return event.target !== source.handle && event.target !== source.element;
+  },
+});
+```
+
+## Accessible Drag Handles
+
+When using drag handles, ensure they're properly labeled:
+
+```tsx
+function SortableWithHandle({id, index}) {
+  const [element, setElement] = useState(null);
+  const [handle, setHandle] = useState(null);
+  const {isDragging} = useSortable({id, index, element, handle});
+  
+  return (
+    <div ref={setElement}>
+      <button
+        ref={setHandle}
+        aria-label={`Drag to reorder ${id}`}
+        aria-describedby="drag-instructions"
+      >
+        ⋮⋮
+      </button>
+      <span>{id}</span>
+    </div>
+  );
+}
+```
+
+## Testing Accessibility
+
+### Keyboard Testing Checklist
+
+<Steps>
+  <Step title="Tab Navigation">
+    Verify you can tab to all draggable items
+  </Step>
+  
+  <Step title="Keyboard Dragging">
+    Test dragging with Space/Enter and arrow keys
+  </Step>
+  
+  <Step title="Escape Cancellation">
+    Confirm Escape cancels the drag operation
+  </Step>
+  
+  <Step title="Focus Management">
+    Ensure focus returns to the correct element after drop
+  </Step>
+</Steps>
+
+### Screen Reader Testing
+
+- Test with **NVDA** (Windows), **JAWS** (Windows), or **VoiceOver** (macOS)
+- Verify announcements are clear and timely
+- Ensure instructions are read when focusing items
+- Check that drag state changes are announced
+
+## Best Practices
+
+<Tip>
+**Provide Visual Focus Indicators**
+
+Always style `:focus` and `:focus-visible` states clearly:
+
+```css
+.draggable:focus-visible {
+  outline: 2px solid #4c9ffe;
+  outline-offset: 2px;
+}
+```
+</Tip>
+
+<Tip>
+**Use Semantic HTML**
+
+Use semantic elements when appropriate:
+
+```tsx
+// Good: Uses a button for the drag handle
+<button ref={setHandle} aria-label="Drag to reorder">
+  <DragIcon />
+</button>
+
+// Avoid: Generic div without proper ARIA
+<div ref={setHandle}>
+  <DragIcon />
+</div>
+```
+</Tip>
+
+<Warning>
+**Don't Disable Keyboard Access**
+
+Never remove keyboard functionality for aesthetic reasons. If you customize sensors, always include the KeyboardSensor.
+</Warning>
+
+## Reduced Motion Support
+
+The library automatically respects `prefers-reduced-motion`:
+
+```tsx
+// Transitions are automatically disabled when user prefers reduced motion
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  transition: {
+    duration: 250,
+    easing: 'ease-out',
+  },
+});
+// When prefers-reduced-motion is enabled, duration becomes 0
+```
+
+## Next Steps
+
+<Steps>
+  <Step title="Implement Keyboard Support">
+    Add custom [keyboard sensors](/guides/custom-sensors) for specialized interactions
+  </Step>
+  
+  <Step title="Optimize Announcements">
+    Tune announcement timing and content for your use case
+  </Step>
+  
+  <Step title="Test with Users">
+    Conduct accessibility testing with real assistive technology users
+  </Step>
+</Steps>

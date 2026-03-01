@@ -1,0 +1,109 @@
+---
+title: Vue Overview
+description: Complete API reference for dnd-kit Vue integration
+---
+
+The Vue integration for dnd-kit provides composables and components that enable drag and drop functionality in Vue 3 applications.
+
+## Architecture
+
+The Vue integration is built on top of the core `@dnd-kit/dom` package and provides:
+
+- **Composables**: Reactive hooks that manage drag and drop state
+- **Components**: Vue components for context and overlay management
+- **Type Safety**: Full TypeScript support with proper type inference
+- **Reactivity**: Deep integration with Vue's reactivity system
+
+## Core Concepts
+
+### DragDropProvider
+
+The root component that provides drag and drop context to your application:
+
+```vue
+<script setup>
+import { DragDropProvider } from '@dnd-kit/vue';
+</script>
+
+<template>
+  <DragDropProvider>
+    <!-- Your draggable and droppable components -->
+  </DragDropProvider>
+</template>
+```
+
+### Composables
+
+Vue composables provide reactive drag and drop functionality:
+
+- **useDraggable**: Make elements draggable
+- **useDroppable**: Make elements droppable
+- **useSortable**: Combine draggable and droppable for sortable items
+- **useDragDropMonitor**: Listen to drag and drop events
+- **useDragOperation**: Access the current drag operation state
+- **useDragDropManager**: Access the drag drop manager instance
+
+### Reactivity Integration
+
+The Vue integration uses `MaybeRefOrGetter<T>` types to accept refs, getters, or raw values:
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { useDraggable } from '@dnd-kit/vue';
+
+const id = ref('item-1');
+const disabled = ref(false);
+
+const { draggable, isDragging } = useDraggable({
+  id,           // ref
+  disabled,     // ref
+  data: { name: 'Item 1' } // raw value
+});
+</script>
+```
+
+## Installation
+
+```bash
+npm install @dnd-kit/vue @dnd-kit/dom @dnd-kit/abstract
+```
+
+## Package Exports
+
+### Core
+
+- `DragDropProvider` - Context provider component
+- `DragOverlay` - Overlay component for drag preview
+- `useDraggable` - Draggable composable
+- `useDroppable` - Droppable composable
+- `useDragDropManager` - Manager access composable
+- `useDragDropMonitor` - Event monitoring composable
+- `useDragOperation` - Drag operation state composable
+- `useInstance` - Instance creation composable
+
+### Sortable
+
+- `useSortable` - Sortable item composable
+- `isSortable` - Type guard for sortable instances
+- `isSortableOperation` - Type guard for sortable operations
+
+### Utilities
+
+- `useDeepSignal` - Deep reactivity bridge for signals
+
+### Sensors
+
+- `PointerSensor` - Mouse and touch input
+- `KeyboardSensor` - Keyboard navigation
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Composables" icon="code" href="/api/vue/composables">
+    Detailed reference for all Vue composables
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/frameworks/vue">
+    Get started with Vue integration
+  </Card>
+</CardGroup>

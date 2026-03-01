@@ -1,0 +1,366 @@
+---
+title: Building Sortable Lists
+description: Learn how to create sortable lists, grids, and multi-container sorting interfaces with dnd-kit
+---
+
+Sortable lists combine drag and drop functionality with automatic reordering. The `useSortable` hook provides everything you need to build sortable interfaces.
+
+## Basic Sortable List
+
+Create a simple sortable list by combining `DragDropProvider` with `useSortable`:
+
+```tsx
+import {useState} from 'react';
+import {DragDropProvider} from '@dnd-kit/react';
+import {useSortable} from '@dnd-kit/react/sortable';
+import {move} from '@dnd-kit/helpers';
+
+function SortableItem({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        padding: '12px 20px',
+        border: '2px solid #4c9ffe',
+        borderRadius: '8px',
+        background: '#e8f0fe',
+        cursor: 'grab',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+
+function App() {
+  const [items, setItems] = useState([1, 2, 3, 4, 5]);
+
+  return (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        setItems((items) => move(items, event));
+      }}
+    >
+      <div style={{display: 'flex', flexDirection: 'column', gap: 18}}>
+        {items.map((id, index) => (
+          <SortableItem key={id} id={id} index={index} />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+The `move` helper automatically calculates the new array order based on the drag operation.
+
+## Sortable Grid
+
+Build a sortable grid by adjusting the container layout:
+
+```tsx
+function GridSortable({id, index}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({id, index, element});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        height: 150,
+        opacity: isDragging ? 0.5 : 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: '2px solid #4c9ffe',
+        borderRadius: '8px',
+        background: '#e8f0fe',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+
+function App() {
+  const [items, setItems] = useState(Array.from({length: 20}, (_, i) => i + 1));
+
+  return (
+    <DragDropProvider onDragEnd={(event) => setItems((items) => move(items, event))}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, 150px)',
+          gridAutoRows: 150,
+          gap: 18,
+          maxWidth: 900,
+          margin: '0 auto',
+        }}
+      >
+        {items.map((id, index) => (
+          <GridSortable key={id} id={id} index={index} />
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+```
+
+## Using the Sortable Hook
+
+The `useSortable` hook returns several useful properties and refs:
+
+```tsx
+const {
+  sortable,        // The sortable instance
+  isDragging,      // True when this item is being dragged
+  isDropping,      // True during drop animation
+  isDragSource,    // True when this is the drag source
+  isDropTarget,    // True when this is a drop target
+  ref,             // Ref for the draggable element
+  handleRef,       // Ref for a drag handle (optional)
+  targetRef,       // Ref for custom drop target
+} = useSortable({id, index, element});
+```
+
+## Drag Handles
+
+Add a drag handle to make only part of the item draggable:
+
+```tsx
+function SortableWithHandle({id, index}) {
+  const [element, setElement] = useState(null);
+  const [handle, setHandle] = useState(null);
+  const {isDragging} = useSortable({id, index, element, handle});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        padding: 12,
+        border: '2px solid #4c9ffe',
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <button
+        ref={setHandle}
+        style={{
+          cursor: 'grab',
+          padding: '4px 8px',
+          background: '#4c9ffe',
+          border: 'none',
+          borderRadius: 4,
+          color: 'white',
+        }}
+      >
+        ⋮⋮
+      </button>
+      <span>Item {id}</span>
+    </div>
+  );
+}
+```
+
+<Tip>
+Use drag handles when items contain interactive elements like buttons or inputs. This prevents conflicts between dragging and clicking.
+</Tip>
+
+## Multi-Container Sorting
+
+Create sortable items that can move between different lists using groups:
+
+```tsx
+function MultiContainerApp() {
+  const [containers, setContainers] = useState({
+    A: [1, 2, 3],
+    B: [4, 5, 6],
+  });
+
+  const handleDragEnd = (event) => {
+    if (event.canceled) return;
+
+    const {source, target} = event.operation;
+    if (!source || !target) return;
+
+    setContainers((containers) => {
+      // Move item between or within containers
+      const sourceGroup = source.group;
+      const targetGroup = target.group;
+      
+      if (sourceGroup === targetGroup) {
+        // Same container - reorder
+        return {
+          ...containers,
+          [sourceGroup]: move(containers[sourceGroup], event),
+        };
+      } else {
+        // Different containers - move between them
+        const sourceItems = [...containers[sourceGroup]];
+        const targetItems = [...containers[targetGroup]];
+        const [movedItem] = sourceItems.splice(source.index, 1);
+        targetItems.splice(target.index, 0, movedItem);
+        
+        return {
+          ...containers,
+          [sourceGroup]: sourceItems,
+          [targetGroup]: targetItems,
+        };
+      }
+    });
+  };
+
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd}>
+      <div style={{display: 'flex', gap: 24}}>
+        {Object.entries(containers).map(([group, items]) => (
+          <div key={group} style={{flex: 1}}>
+            <h3>Container {group}</h3>
+            <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+              {items.map((id, index) => (
+                <SortableItem key={id} id={id} index={index} group={group} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </DragDropProvider>
+  );
+}
+
+function SortableItem({id, index, group}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({id, index, element, group});
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        padding: 12,
+        border: '2px solid #4c9ffe',
+        borderRadius: 8,
+      }}
+    >
+      Item {id}
+    </div>
+  );
+}
+```
+
+## Disabling Sortable Items
+
+Disable specific items from being dragged or accepting drops:
+
+```tsx
+function SortableItem({id, index, disabled}) {
+  const [element, setElement] = useState(null);
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element,
+    disabled,  // Prevents both dragging and dropping
+  });
+
+  return (
+    <div
+      ref={setElement}
+      style={{
+        opacity: disabled ? 0.3 : isDragging ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'grab',
+      }}
+    >
+      {id}
+    </div>
+  );
+}
+```
+
+## Custom Data
+
+Attach custom data to sortable items:
+
+```tsx
+const {isDragging} = useSortable({
+  id,
+  index,
+  element,
+  data: {
+    category: 'important',
+    priority: 1,
+    metadata: {...},
+  },
+});
+```
+
+Access this data in event handlers:
+
+```tsx
+<DragDropProvider
+  onDragEnd={(event) => {
+    const sourceData = event.operation.source?.data;
+    const targetData = event.operation.target?.data;
+    console.log('Source category:', sourceData?.category);
+  }}
+>
+```
+
+<Warning>
+Always provide a unique `id` for each sortable item. Using array indices as IDs can cause issues when items are added or removed.
+</Warning>
+
+## Advanced: Separate Source and Target
+
+For complex layouts, you can specify different elements for the draggable source and drop target:
+
+```tsx
+function SortableItem({id, index}) {
+  const [source, setSource] = useState(null);
+  const [target, setTarget] = useState(null);
+  const {isDragging} = useSortable({
+    id,
+    index,
+    element: source,  // Element to drag
+    target,           // Element to drop onto
+  });
+
+  return (
+    <div ref={setTarget} style={{padding: 4, border: '1px dashed #ccc'}}>
+      <div
+        ref={setSource}
+        style={{
+          padding: 12,
+          background: '#e8f0fe',
+          opacity: isDragging ? 0.5 : 1,
+        }}
+      >
+        Item {id}
+      </div>
+    </div>
+  );
+}
+```
+
+This pattern is useful when you need visual spacing around drop zones.
+
+## Next Steps
+
+<Steps>
+  <Step title="Customize Transitions">
+    Learn how to configure [animations and transitions](/guides/animations) for smooth sorting effects
+  </Step>
+  
+  <Step title="Add Accessibility">
+    Ensure your sortable lists are accessible with [keyboard navigation](/guides/accessibility)
+  </Step>
+  
+  <Step title="Optimize Performance">
+    Improve rendering performance for large lists with [optimization techniques](/guides/performance)
+  </Step>
+</Steps>

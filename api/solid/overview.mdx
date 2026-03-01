@@ -1,0 +1,137 @@
+---
+title: Solid Overview
+description: Complete API reference for dnd-kit Solid integration
+---
+
+The Solid integration for dnd-kit provides hooks and components that enable drag and drop functionality in SolidJS applications.
+
+## Architecture
+
+The Solid integration is built on top of the core `@dnd-kit/dom` package and provides:
+
+- **Hooks**: Reactive hooks that manage drag and drop state
+- **Components**: Solid components for context and overlay management
+- **Type Safety**: Full TypeScript support with proper type inference
+- **Signals Integration**: Deep integration with SolidJS signals and reactivity
+
+## Core Concepts
+
+### DragDropProvider
+
+The root component that provides drag and drop context to your application:
+
+```tsx
+import { DragDropProvider } from '@dnd-kit/solid';
+
+function App() {
+  return (
+    <DragDropProvider>
+      {/* Your draggable and droppable components */}
+    </DragDropProvider>
+  );
+}
+```
+
+### Hooks
+
+Solid hooks provide reactive drag and drop functionality:
+
+- **useDraggable**: Make elements draggable
+- **useDroppable**: Make elements droppable
+- **useSortable**: Combine draggable and droppable for sortable items
+- **useDragDropMonitor**: Listen to drag and drop events
+- **useDragOperation**: Access the current drag operation state
+- **useDragDropManager**: Access the drag drop manager instance
+
+### Ref-Based Element Attachment
+
+Solid hooks return ref setters for attaching elements:
+
+```tsx
+import { useDraggable } from '@dnd-kit/solid';
+
+function DraggableCard() {
+  const { ref, isDragging } = useDraggable({
+    id: 'card-1',
+    data: { type: 'card' }
+  });
+
+  return (
+    <div ref={ref} classList={{ dragging: isDragging() }}>
+      Drag me
+    </div>
+  );
+}
+```
+
+## Installation
+
+```bash
+npm install @dnd-kit/solid @dnd-kit/dom @dnd-kit/abstract
+```
+
+## Package Exports
+
+### Core
+
+- `DragDropProvider` - Context provider component
+- `DragOverlay` - Overlay component for drag preview
+- `useDraggable` - Draggable hook
+- `useDroppable` - Droppable hook
+- `useDragDropManager` - Manager access hook
+- `useDragDropMonitor` - Event monitoring hook
+- `useDragOperation` - Drag operation state hook
+- `useInstance` - Instance creation hook
+
+### Sortable
+
+- `useSortable` - Sortable item hook
+- `isSortable` - Type guard for sortable instances
+- `isSortableOperation` - Type guard for sortable operations
+
+### Utilities
+
+- `useDeepSignal` - Deep reactivity bridge for signals
+
+### Sensors
+
+- `PointerSensor` - Mouse and touch input
+- `KeyboardSensor` - Keyboard navigation
+
+## Reactivity Model
+
+The Solid integration uses `createEffect` to sync reactive properties and `createSignal` for refs:
+
+```tsx
+import { createSignal } from 'solid-js';
+import { useDraggable } from '@dnd-kit/solid';
+
+function DraggableItem() {
+  const [disabled, setDisabled] = createSignal(false);
+
+  const { draggable, isDragging, ref } = useDraggable({
+    id: 'item-1',
+    get disabled() { return disabled(); }
+  });
+
+  // When disabled changes, the draggable automatically updates
+  return (
+    <div ref={ref}>
+      <button onClick={() => setDisabled(!disabled())}>
+        Toggle
+      </button>
+    </div>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hooks" icon="code" href="/api/solid/hooks">
+    Detailed reference for all Solid hooks
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/frameworks/solid">
+    Get started with Solid integration
+  </Card>
+</CardGroup>

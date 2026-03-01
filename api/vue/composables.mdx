@@ -1,0 +1,407 @@
+---
+title: Vue Composables
+description: Complete API reference for dnd-kit Vue composables
+---
+
+## useDraggable
+
+Make an element draggable.
+
+### Usage
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { useDraggable } from '@dnd-kit/vue';
+
+const draggableRef = ref();
+
+const { draggable, isDragging, isDropping, isDragSource } = useDraggable({
+  id: 'draggable-1',
+  element: draggableRef,
+  data: { type: 'card' }
+});
+</script>
+
+<template>
+  <div ref="draggableRef" :class="{ dragging: isDragging }">
+    Drag me
+  </div>
+</template>
+```
+
+### Parameters
+
+<ParamField path="id" type="MaybeRefOrGetter<string | number>" required>
+  Unique identifier for the draggable element
+</ParamField>
+
+<ParamField path="element" type="MaybeRefOrGetter<MaybeElement>">
+  The DOM element to make draggable. Can be a ref, component instance, or raw element.
+</ParamField>
+
+<ParamField path="handle" type="MaybeRefOrGetter<MaybeElement>">
+  Optional drag handle element. If provided, only this element can initiate drag.
+</ParamField>
+
+<ParamField path="data" type="MaybeRefOrGetter<T>">
+  Custom data to attach to the draggable instance
+</ParamField>
+
+<ParamField path="disabled" type="MaybeRefOrGetter<boolean>">
+  Whether the draggable is disabled
+</ParamField>
+
+<ParamField path="alignment" type="MaybeRefOrGetter<Alignment>">
+  Alignment configuration for the draggable element
+</ParamField>
+
+<ParamField path="plugins" type="MaybeRefOrGetter<Plugin[]>">
+  Array of plugins to apply to this draggable
+</ParamField>
+
+<ParamField path="modifiers" type="MaybeRefOrGetter<Modifier[]>">
+  Array of modifiers to transform drag coordinates
+</ParamField>
+
+<ParamField path="sensors" type="MaybeRefOrGetter<Sensor[]>">
+  Custom sensors for this draggable instance
+</ParamField>
+
+### Returns
+
+<ResponseField name="draggable" type="Readonly<Ref<Draggable>>">
+  The draggable instance (readonly)
+</ResponseField>
+
+<ResponseField name="isDragging" type="ComputedRef<boolean>">
+  Whether this element is currently being dragged
+</ResponseField>
+
+<ResponseField name="isDropping" type="ComputedRef<boolean>">
+  Whether this element is currently dropping
+</ResponseField>
+
+<ResponseField name="isDragSource" type="ComputedRef<boolean>">
+  Whether this element is the source of the current drag operation
+</ResponseField>
+
+---
+
+## useDroppable
+
+Make an element droppable.
+
+### Usage
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { useDroppable } from '@dnd-kit/vue';
+
+const droppableRef = ref();
+
+const { droppable, isDropTarget } = useDroppable({
+  id: 'droppable-1',
+  element: droppableRef,
+  accept: ['card']
+});
+</script>
+
+<template>
+  <div ref="droppableRef" :class="{ 'drop-target': isDropTarget }">
+    Drop here
+  </div>
+</template>
+```
+
+### Parameters
+
+<ParamField path="id" type="MaybeRefOrGetter<string | number>" required>
+  Unique identifier for the droppable element
+</ParamField>
+
+<ParamField path="element" type="MaybeRefOrGetter<MaybeElement>">
+  The DOM element to make droppable
+</ParamField>
+
+<ParamField path="accept" type="MaybeRefOrGetter<string[]>">
+  Array of draggable types this droppable accepts
+</ParamField>
+
+<ParamField path="type" type="MaybeRefOrGetter<string>">
+  Type identifier for this droppable
+</ParamField>
+
+<ParamField path="disabled" type="MaybeRefOrGetter<boolean>">
+  Whether the droppable is disabled
+</ParamField>
+
+<ParamField path="data" type="MaybeRefOrGetter<T>">
+  Custom data to attach to the droppable instance
+</ParamField>
+
+<ParamField path="collisionDetector" type="MaybeRefOrGetter<CollisionDetector>">
+  Custom collision detection algorithm
+</ParamField>
+
+### Returns
+
+<ResponseField name="droppable" type="Readonly<Ref<Droppable>>">
+  The droppable instance (readonly)
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="ComputedRef<boolean>">
+  Whether this element is currently a valid drop target
+</ResponseField>
+
+---
+
+## useSortable
+
+Combine draggable and droppable functionality for sortable items.
+
+### Usage
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { useSortable } from '@dnd-kit/vue/sortable';
+
+const sortableRef = ref();
+
+const { 
+  sortable, 
+  isDragging, 
+  isDropTarget,
+  isDragSource,
+  isDropping
+} = useSortable({
+  id: 'item-1',
+  element: sortableRef,
+  group: 'list',
+  index: 0
+});
+</script>
+
+<template>
+  <div 
+    ref="sortableRef" 
+    :class="{ 
+      dragging: isDragging, 
+      'drop-target': isDropTarget 
+    }"
+  >
+    Sortable item
+  </div>
+</template>
+```
+
+### Parameters
+
+Includes all parameters from `useDraggable` and `useDroppable`, plus:
+
+<ParamField path="group" type="MaybeRefOrGetter<string | number>" required>
+  The sortable group this item belongs to
+</ParamField>
+
+<ParamField path="index" type="MaybeRefOrGetter<number>" required>
+  The current index of this item in the sortable group
+</ParamField>
+
+<ParamField path="source" type="MaybeRefOrGetter<MaybeElement>">
+  Optional source element for the sortable
+</ParamField>
+
+<ParamField path="target" type="MaybeRefOrGetter<MaybeElement>">
+  Optional target element for drop positioning
+</ParamField>
+
+<ParamField path="transition" type="MaybeRefOrGetter<Transition>">
+  Transition configuration for sortable animations
+</ParamField>
+
+<ParamField path="collisionPriority" type="MaybeRefOrGetter<number>">
+  Priority for collision detection when multiple droppables overlap
+</ParamField>
+
+### Returns
+
+<ResponseField name="sortable" type="Readonly<Ref<Sortable>>">
+  The sortable instance (readonly)
+</ResponseField>
+
+<ResponseField name="isDragging" type="ComputedRef<boolean>">
+  Whether this element is currently being dragged
+</ResponseField>
+
+<ResponseField name="isDropping" type="ComputedRef<boolean>">
+  Whether this element is currently dropping
+</ResponseField>
+
+<ResponseField name="isDragSource" type="ComputedRef<boolean>">
+  Whether this element is the source of the current drag operation
+</ResponseField>
+
+<ResponseField name="isDropTarget" type="ComputedRef<boolean>">
+  Whether this element is currently a valid drop target
+</ResponseField>
+
+---
+
+## useDragDropMonitor
+
+Listen to drag and drop events.
+
+### Usage
+
+```vue
+<script setup>
+import { useDragDropMonitor } from '@dnd-kit/vue';
+
+useDragDropMonitor({
+  onDragStart(event) {
+    console.log('Drag started:', event.operation.source);
+  },
+  onDragMove(event) {
+    console.log('Dragging:', event.operation.shape.current);
+  },
+  onDragEnd(event) {
+    console.log('Drag ended:', event.operation);
+  },
+  onBeforeDragStart(event) {
+    // Can modify or cancel the drag operation
+    if (shouldCancel) {
+      event.preventDefault();
+    }
+  }
+});
+</script>
+```
+
+### Parameters
+
+<ParamField path="onBeforeDragStart" type="(event: BeforeDragStartEvent) => void">
+  Called before drag starts. Can cancel the operation.
+</ParamField>
+
+<ParamField path="onDragStart" type="(event: DragStartEvent) => void">
+  Called when drag operation starts
+</ParamField>
+
+<ParamField path="onDragMove" type="(event: DragMoveEvent) => void">
+  Called when the dragged element moves
+</ParamField>
+
+<ParamField path="onDragOver" type="(event: DragOverEvent) => void">
+  Called when dragging over a droppable
+</ParamField>
+
+<ParamField path="onDragEnd" type="(event: DragEndEvent) => void">
+  Called when drag operation ends
+</ParamField>
+
+<ParamField path="onDragCancel" type="(event: DragCancelEvent) => void">
+  Called when drag operation is cancelled
+</ParamField>
+
+---
+
+## useDragOperation
+
+Access the current drag operation state.
+
+### Usage
+
+```vue
+<script setup>
+import { useDragOperation } from '@dnd-kit/vue';
+
+const dragOperation = useDragOperation();
+</script>
+
+<template>
+  <div v-if="dragOperation.source">
+    Currently dragging: {{ dragOperation.source.id }}
+  </div>
+  <div v-if="dragOperation.target">
+    Over: {{ dragOperation.target.id }}
+  </div>
+  <div>
+    Status: {{ dragOperation.status.idle ? 'idle' : 'active' }}
+  </div>
+</template>
+```
+
+### Returns
+
+<ResponseField name="source" type="Draggable | null">
+  The source draggable element of the current operation
+</ResponseField>
+
+<ResponseField name="target" type="Droppable | null">
+  The current drop target
+</ResponseField>
+
+<ResponseField name="status" type="DragOperationStatus">
+  The status of the drag operation (idle, dragging, dropping)
+</ResponseField>
+
+---
+
+## useDragDropManager
+
+Access the drag drop manager instance.
+
+### Usage
+
+```vue
+<script setup>
+import { useDragDropManager } from '@dnd-kit/vue';
+
+const manager = useDragDropManager();
+
+// Access manager properties
+const draggables = manager.value.registry.draggables;
+const droppables = manager.value.registry.droppables;
+</script>
+```
+
+### Returns
+
+<ResponseField name="manager" type="Ref<DragDropManager>">
+  The drag drop manager instance
+</ResponseField>
+
+---
+
+## useDeepSignal
+
+Create a deep reactive proxy for signal-based objects.
+
+### Usage
+
+```vue
+<script setup>
+import { computed } from 'vue';
+import { useDeepSignal } from '@dnd-kit/vue/composables';
+
+const source = computed(() => manager.value.dragOperation);
+const tracked = useDeepSignal(source);
+
+// Accessing nested signal properties triggers reactivity
+const sourceId = tracked.value.source?.id;
+</script>
+```
+
+### Parameters
+
+<ParamField path="target" type="MaybeRefOrGetter<T>" required>
+  The target object to track (typically contains signals)
+</ParamField>
+
+### Returns
+
+<ResponseField name="proxy" type="ComputedRef<T>">
+  A computed ref that proxies access to the target and triggers reactivity on nested signal reads
+</ResponseField>
