@@ -509,6 +509,76 @@ class Sortable<T extends Data = Data> {
 }
 ```
 
+## Additional Exports
+
+### SortableDraggable
+
+A specialized `Draggable` class optimized for sortable items:
+
+```typescript
+import { SortableDraggable } from '@dnd-kit/dom/sortable';
+
+class SortableDraggable<T extends Data = Data> extends Draggable<T> {
+  // Specialized for sortable use cases
+}
+```
+
+### SortableDroppable
+
+A specialized `Droppable` class optimized for sortable drop targets:
+
+```typescript
+import { SortableDroppable } from '@dnd-kit/dom/sortable';
+
+class SortableDroppable<T extends Data = Data> extends Droppable<T> {
+  // Specialized for sortable use cases
+}
+```
+
+### defaultSortableTransition
+
+The default transition configuration for sortable items:
+
+```typescript
+import { defaultSortableTransition } from '@dnd-kit/dom/sortable';
+
+const defaultTransition: SortableTransition = {
+  duration: 250,
+  easing: 'ease',
+  idle: false
+};
+```
+
+### Utility Functions
+
+#### isSortable
+
+Type guard to check if an entity is a sortable:
+
+```typescript
+import { isSortable } from '@dnd-kit/dom/sortable';
+
+if (isSortable(entity)) {
+  console.log('Index:', entity.index);
+  console.log('Group:', entity.group);
+}
+```
+
+#### isSortableOperation
+
+Type guard to check if a drag operation involves sortables:
+
+```typescript
+import { isSortableOperation } from '@dnd-kit/dom/sortable';
+
+manager.monitor.addEventListener('dragover', (event) => {
+  if (isSortableOperation(event.operation)) {
+    console.log('Source index:', event.operation.source.index);
+    console.log('Target index:', event.operation.target?.index);
+  }
+});
+```
+
 ## Related
 
 - [DragDropManager](/api/dom/drag-drop-manager) - Configure the manager
