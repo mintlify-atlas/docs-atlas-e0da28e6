@@ -1,0 +1,192 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "dnd kit",
+  "projectDescription": "A modern, lightweight, and extensible drag and drop toolkit for building interactive interfaces",
+  "theme": "palm",
+  "primaryColor": "#3b82f6",
+  "lightColor": "#60a5fa",
+  "darkColor": "#2563eb",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/drag-drop-manager",
+              "concepts/draggables-droppables",
+              "concepts/sensors",
+              "concepts/collision-detection",
+              "concepts/modifiers",
+              "concepts/plugins"
+            ]
+          },
+          {
+            "group": "Framework Guides",
+            "pages": [
+              "frameworks/vanilla",
+              "frameworks/react",
+              "frameworks/vue",
+              "frameworks/svelte",
+              "frameworks/solid"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/sortable",
+              "guides/accessibility",
+              "guides/custom-sensors",
+              "guides/animations",
+              "guides/performance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Packages",
+            "pages": [
+              "api/abstract/overview",
+              "api/abstract/drag-drop-manager",
+              "api/abstract/draggable",
+              "api/abstract/droppable",
+              "api/abstract/sensors",
+              "api/abstract/modifiers",
+              "api/abstract/plugins"
+            ]
+          },
+          {
+            "group": "DOM Implementation",
+            "pages": [
+              "api/dom/overview",
+              "api/dom/drag-drop-manager",
+              "api/dom/sensors",
+              "api/dom/plugins",
+              "api/dom/sortable"
+            ]
+          },
+          {
+            "group": "React",
+            "pages": [
+              "api/react/overview",
+              "api/react/drag-drop-provider",
+              "api/react/use-draggable",
+              "api/react/use-droppable",
+              "api/react/use-sortable",
+              "api/react/drag-overlay",
+              "api/react/hooks"
+            ]
+          },
+          {
+            "group": "Vue",
+            "pages": [
+              "api/vue/overview",
+              "api/vue/composables"
+            ]
+          },
+          {
+            "group": "Svelte",
+            "pages": [
+              "api/svelte/overview",
+              "api/svelte/primitives"
+            ]
+          },
+          {
+            "group": "Solid",
+            "pages": [
+              "api/solid/overview",
+              "api/solid/hooks"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/collision/algorithms",
+              "api/geometry/utilities",
+              "api/helpers/utilities",
+              "api/state/management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Examples",
+            "pages": [
+              "examples/simple-drag-drop",
+              "examples/multiple-containers",
+              "examples/nested-contexts"
+            ]
+          },
+          {
+            "group": "Sortable Lists",
+            "pages": [
+              "examples/sortable-list",
+              "examples/sortable-grid",
+              "examples/multiple-lists",
+              "examples/virtualized-lists"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "examples/custom-collision-detection",
+              "examples/custom-animations",
+              "examples/accessibility-features",
+              "examples/touch-keyboard-support"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Framework-agnostic core architecture",
+    "Multi-framework support (React, Vue, Svelte, Solid)",
+    "Built-in sortable lists and grids",
+    "Customizable collision detection algorithms",
+    "Accessibility with keyboard support",
+    "Plugin system for extensibility",
+    "Modifiers for drag constraints",
+    "Multiple input methods (pointer, mouse, touch, keyboard)"
+  ],
+  "publicApiSurface": [
+    "DragDropManager",
+    "Draggable",
+    "Droppable",
+    "Sortable",
+    "PointerSensor",
+    "KeyboardSensor",
+    "useDraggable (React)",
+    "useDroppable (React)",
+    "useSortable (React)",
+    "DragDropProvider (React)",
+    "DragOverlay (React)",
+    "closestCenter",
+    "closestCorners",
+    "pointerIntersection",
+    "shapeIntersection",
+    "AxisModifier",
+    "SnapModifier",
+    "restrictShapeToBoundingRectangle",
+    "Accessibility plugin",
+    "AutoScroller plugin",
+    "Feedback plugin",
+    "Cursor plugin"
+  ]
+}
